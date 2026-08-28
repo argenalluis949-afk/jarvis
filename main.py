@@ -73,9 +73,6 @@ async def procesar(data: EntradaTexto):
     except Exception as e:
         logging.error(f"Error en Groq: {str(e)}")
         return {"respuesta": "Señor, he detectado una anomalía en el procesamiento central."}
-        # Al final de main.py
-from fastapi import FastAPI
-# ... todo tu código ...
 
 # Añadir esto al final:
 app = app
