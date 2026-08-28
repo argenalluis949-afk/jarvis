@@ -1,35 +1,30 @@
 import os
-import logging
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
 from groq import Groq
+import logging
 
-# Configurar logs para ver errores en la consola de Render
-logging.basicConfig(level=logging.INFO)
-
-# Cargar variables de entorno
-load_dotenv()
+# Configurar logs
+logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI(title="J.A.R.V.I.S. HUD Interface")
-from fastapi.middleware.cors import CORSMiddleware
 
-# ... tu código de load_dotenv, app = FastAPI, etc ...
-
-# AÑADE ESTO JUSTO DESPUÉS DE CREAR LA APP:
+# Añadir CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permite peticiones desde cualquier lugar
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Inicialización del cliente Groq
+# Verificar la clave de Groq
 GROQ_KEY = os.getenv("GROQ_API_KEY")
+logging.info(f"GROQ_API_KEY encontrada: {'Sí' if GROQ_KEY else 'No'}")
+
 if not GROQ_KEY:
-    logging.warning("¡ADVERTENCIA! GROQ_API_KEY no encontrada en las variables de entorno.")
+    logging.error("ERROR: GROQ_API_KEY no está configurada en Vercel")
 
 client_groq = Groq(api_key=GROQ_KEY) if GROQ_KEY else None
 
