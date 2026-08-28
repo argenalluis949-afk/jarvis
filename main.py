@@ -6,7 +6,6 @@ import os
 
 app = FastAPI()
 
-# Claves obtenidas de las variables de entorno en Render
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 GROQ_KEY = os.getenv("GROQ_KEY")
 
@@ -20,72 +19,19 @@ def inicio():
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>JARVIS AI</title>
+        <title>JARVIS SYSTEM</title>
         <style>
-            body {
-                margin: 0;
-                padding: 0;
-                background-color: #0b0f19;
-                color: #e2e8f0;
-                font-family: Arial, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-            }
-
-            .container {
-                text-align: center;
-                background: #1e293b;
-                padding: 40px;
-                border-radius: 16px;
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-                max-width: 450px;
-                width: 90%;
-            }
-
-            h1 {
-                margin-bottom: 30px;
-                color: #38bdf8;
-                letter-spacing: 2px;
-            }
-
-            button {
-                background-color: #0284c7;
-                color: white;
-                border: none;
-                padding: 16px 32px;
-                font-size: 18px;
-                font-weight: bold;
-                border-radius: 50px;
-                cursor: pointer;
-                transition: background 0.3s ease, transform 0.2s ease;
-                box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
-            }
-
-            button:hover {
-                background-color: #0369a1;
-                transform: scale(1.03);
-            }
-
-            #status {
-                margin-top: 25px;
-                font-size: 15px;
-                color: #94a3b8;
-            }
-
-            #res {
-                margin-top: 20px;
-                font-size: 18px;
-                font-weight: bold;
-                color: #4ade80;
-            }
+            body { background-color: #0b0f19; color: white; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .card { background: #1e293b; padding: 40px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+            h1 { color: #38bdf8; margin-bottom: 25px; }
+            button { background: #0284c7; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 50px; cursor: pointer; }
+            button:hover { background: #0369a1; }
+            #status { margin-top: 20px; color: #94a3b8; }
+            #res { margin-top: 20px; font-size: 20px; color: #4ade80; font-weight: bold; }
         </style>
     </head>
     <body>
-        <div class="container">
+        <div class="card">
             <h1>JARVIS SYSTEM</h1>
             <button onclick="startRecording()">🎤 Presiona para Hablar</button>
             <div id="status">SISTEMA ONLINE</div>
@@ -106,7 +52,7 @@ def inicio():
 
                     mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
                     mediaRecorder.onstop = async () => {
-                        status.innerText = "Procesando en la nube...";
+                        status.innerText = "Procesando respuesta...";
                         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                         const formData = new FormData();
                         formData.append("file", audioBlob, "voice.wav");
@@ -114,18 +60,17 @@ def inicio():
                         try {
                             const response = await fetch("/jarvis", { method: "POST", body: formData });
                             const data = await response.json();
-                            
                             status.innerText = "Tú: " + data.escuchado;
                             resDiv.innerText = "JARVIS: " + data.respuesta_jarvis;
-                        } catch (err) {
-                            status.innerText = "Error de comunicación con el servidor.";
+                        } catch (e) {
+                            status.innerText = "Error procesando el audio";
                         }
                     };
 
                     mediaRecorder.start();
                     setTimeout(() => mediaRecorder.stop(), 4000);
-                } catch (err) {
-                    status.innerText = "Error: Permiso de micrófono denegado.";
+                } catch (e) {
+                    status.innerText = "Error: Acceso al micrófono denegado";
                 }
             }
         </script>
@@ -139,7 +84,6 @@ async def procesar_audio(file: UploadFile = File(...)):
     with open(audio_path, "wb") as f:
         f.write(await file.read())
 
-    # Transcripción con Groq
     with open(audio_path, "rb") as audio_file:
         transcripcion = client_groq.audio.transcriptions.create(
             file=(audio_path, audio_file.read()),
@@ -150,11 +94,9 @@ async def procesar_audio(file: UploadFile = File(...)):
     if os.path.exists(audio_path):
         os.remove(audio_path)
 
-    # Respuesta con Gemini (usando el modelo activo)
-    prompt = f"Eres JARVIS, un asistente inteligente, conciso y servicial. Responde en español a esto: {transcripcion}"
-    
+    prompt = f"Eres JARVIS, un asistente inteligente y conciso. Responde en español a esto: {transcripcion}"
     respuesta_gemini = client_gemini.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         contents=prompt
     )
 
