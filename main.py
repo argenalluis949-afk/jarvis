@@ -25,7 +25,7 @@ def inicio():
             body { 
                 background-color: #0b0f19; 
                 color: white; 
-                font-family: Arial, sans-serif; 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
                 display: flex; 
                 flex-direction: column; 
                 align-items: center; 
@@ -36,92 +36,241 @@ def inicio():
             .card { 
                 background: #1e293b; 
                 padding: 40px; 
-                border-radius: 16px; 
+                border-radius: 20px; 
                 text-align: center; 
-                box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
-                max-width: 400px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
+                max-width: 420px;
                 width: 90%;
+                border: 1px solid #334155;
             }
-            h1 { color: #38bdf8; margin-bottom: 25px; }
+            h1 { color: #38bdf8; margin-bottom: 10px; letter-spacing: 2px; }
+            .subtitle { color: #64748b; font-size: 14px; margin-bottom: 25px; }
+            
+            .indicator {
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                background: radial-gradient(circle, #38bdf8 0%, #0284c7 70%);
+                margin: 0 auto 25px auto;
+                box-shadow: 0 0 20px #0284c7;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 36px;
+                transition: all 0.3s ease;
+            }
+            .indicator.listening {
+                background: radial-gradient(circle, #ef4444 0%, #dc2626 70%);
+                box-shadow: 0 0 30px #ef4444;
+                animation: pulse 1s infinite alternate;
+            }
+            .indicator.processing {
+                background: radial-gradient(circle, #f59e0b 0%, #d97706 70%);
+                box-shadow: 0 0 25px #f59e0b;
+            }
+
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                100% { transform: scale(1.08); }
+            }
+
             button { 
                 background: #0284c7; 
                 color: white; 
                 border: none; 
-                padding: 15px 30px; 
-                font-size: 18px; 
+                padding: 14px 28px; 
+                font-size: 16px; 
                 font-weight: bold; 
                 border-radius: 50px; 
                 cursor: pointer; 
-                transition: background 0.2s;
+                transition: all 0.2s;
+                width: 100%;
+                margin-top: 10px;
             }
             button:hover { background: #0369a1; }
-            #status { margin-top: 20px; color: #94a3b8; }
-            #res { margin-top: 20px; font-size: 18px; color: #4ade80; font-weight: bold; }
+            
+            #status { margin-top: 20px; color: #94a3b8; font-weight: 500; }
+            #res { margin-top: 15px; font-size: 17px; color: #38bdf8; font-weight: bold; min-height: 50px; }
+            .voice-select-box { margin-top: 15px; text-align: left; }
+            .voice-select-box label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 5px; }
+            select { width: 100%; padding: 8px; border-radius: 8px; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; }
         </style>
     </head>
     <body>
         <div class="card">
-            <h1>JARVIS SYSTEM</h1>
-            <button id="micBtn" onclick="startRecording()">🎤 Presiona para Hablar</button>
-            <div id="status">SISTEMA ONLINE</div>
+            <h1>JARVIS</h1>
+            <div class="subtitle">Activación por Aplauso</div>
+
+            <div id="orb" class="indicator">🎙️</div>
+
+            <button id="startSysBtn" onclick="iniciarSistema()">⚡ Activar Detección de Aplausos</button>
+
+            <div id="status">Presiona el botón para activar los sensores.</div>
             <div id="res"></div>
+
+            <div class="voice-select-box">
+                <label for="voiceSelect">Voz del sistema:</label>
+                <select id="voiceSelect"></select>
+            </div>
         </div>
 
         <script>
+            let audioContext;
+            let analyser;
+            let microphone;
+            let isSystemActive = false;
+            let isRecording = false;
+            let mediaRecorder;
+            let audioChunks = [];
+            let voices = [];
+
+            function cargarVoces() {
+                voices = window.speechSynthesis.getVoices();
+                const select = document.getElementById('voiceSelect');
+                select.innerHTML = '';
+
+                voices.forEach((voice, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    
+                    if (voice.lang.includes('es') && (voice.name.toLowerCase().includes('male') || voice.name.toLowerCase().includes('pablo') || voice.name.toLowerCase().includes('jorge') || voice.name.toLowerCase().includes('raul') || voice.name.toLowerCase().includes('hombre'))) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            }
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.onvoiceschanged = cargarVoces;
+                cargarVoces();
+            }
+
             function hablar(texto) {
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel(); // Detener cualquier audio previo
+                    window.speechSynthesis.cancel();
                     const utterance = new SpeechSynthesisUtterance(texto);
-                    utterance.lang = 'es-ES'; // Idioma español
-                    utterance.rate = 1.0;     // Velocidad normal
-                    utterance.pitch = 0.9;    // Tono ligeramente más grave para JARVIS
+                    
+                    const select = document.getElementById('voiceSelect');
+                    if (voices[select.value]) {
+                        utterance.voice = voices[select.value];
+                    }
+
+                    utterance.lang = 'es-ES';
+                    utterance.rate = 1.0;     
+                    utterance.pitch = 0.75;  // Voz grave de hombre
+
                     window.speechSynthesis.speak(utterance);
                 }
             }
 
-            async function startRecording() {
-                const status = document.getElementById('status');
-                const resDiv = document.getElementById('res');
-                const btn = document.getElementById('micBtn');
-
-                btn.disabled = true;
-                status.innerText = "Escuchando (4 segundos)...";
-                resDiv.innerText = "";
+            async function iniciarSistema() {
+                if (isSystemActive) return;
 
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    const mediaRecorder = new MediaRecorder(stream);
-                    const audioChunks = [];
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    microphone = audioContext.createMediaStreamSource(stream);
 
-                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = async () => {
-                        status.innerText = "Procesando respuesta...";
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        const formData = new FormData();
-                        formData.append("file", audioBlob, "voice.wav");
+                    analyser.fftSize = 512;
+                    microphone.connect(analyser);
 
-                        try {
-                            const response = await fetch("/jarvis", { method: "POST", body: formData });
-                            const data = await response.json();
-                            
-                            status.innerText = "Tú: " + data.escuchado;
-                            resDiv.innerText = "JARVIS: " + data.respuesta_jarvis;
-                            
-                            // JARVIS responde con voz
-                            hablar(data.respuesta_jarvis);
-                        } catch (e) {
-                            status.innerText = "Error procesando el audio";
-                        } finally {
-                            btn.disabled = false;
-                        }
-                    };
+                    isSystemActive = true;
+                    document.getElementById('startSysBtn').style.display = 'none';
+                    document.getElementById('status').innerText = "🔊 Escuchando aplausos... (Da dos aplausos fuertes)";
 
-                    mediaRecorder.start();
-                    setTimeout(() => mediaRecorder.stop(), 4000);
+                    escucharAplausos(stream);
                 } catch (e) {
-                    status.innerText = "Error: Acceso al micrófono denegado";
-                    btn.disabled = false;
+                    document.getElementById('status').innerText = "Error: Acceso al micrófono denegado.";
                 }
+            }
+
+            let ultimoAplauso = 0;
+
+            function escucharAplausos(stream) {
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                function detectar() {
+                    if (!isSystemActive || isRecording) {
+                        requestAnimationFrame(detectar);
+                        return;
+                    }
+
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    let suma = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        suma += dataArray[i];
+                    }
+                    let promedio = suma / dataArray.length;
+
+                    if (promedio > 65) {
+                        const ahora = Date.now();
+                        if (ahora - ultimoAplauso > 120 && ahora - ultimoAplauso < 800) {
+                            activarJarvis(stream);
+                            ultimoAplauso = 0;
+                        } else {
+                            ultimoAplauso = ahora;
+                        }
+                    }
+                    requestAnimationFrame(detectar);
+                }
+                detectar();
+            }
+
+            async function activarJarvis(stream) {
+                isRecording = true;
+                const orb = document.getElementById('orb');
+                const status = document.getElementById('status');
+                const resDiv = document.getElementById('res');
+
+                orb.className = "indicator listening";
+                orb.innerText = "🎙️";
+                status.innerText = "¡Aplauso detectado! Escuchando orden...";
+                resDiv.innerText = "";
+
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                
+                mediaRecorder.onstop = async () => {
+                    orb.className = "indicator processing";
+                    orb.innerText = "⚙️";
+                    status.innerText = "Procesando respuesta...";
+
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append("file", audioBlob, "voice.wav");
+
+                    try {
+                        const response = await fetch("/jarvis", { method: "POST", body: formData });
+                        const data = await response.json();
+
+                        status.innerText = "Tú: " + data.escuchado;
+                        resDiv.innerText = "JARVIS: " + data.respuesta_jarvis;
+
+                        hablar(data.respuesta_jarvis);
+                    } catch (e) {
+                        status.innerText = "Error procesando el audio.";
+                    } finally {
+                        setTimeout(() => {
+                            isRecording = false;
+                            orb.className = "indicator";
+                            orb.innerText = "🎙️";
+                            status.innerText = "🔊 Escuchando aplausos nuevamente...";
+                        }, 2000);
+                    }
+                };
+
+                mediaRecorder.start();
+                
+                setTimeout(() => {
+                    if (mediaRecorder.state === "recording") {
+                        mediaRecorder.stop();
+                    }
+                }, 4000);
             }
         </script>
     </body>
@@ -137,17 +286,16 @@ async def procesar_audio(file: UploadFile = File(...)):
         audio_bytes = await file.read()
         audio_file_tuple = ("voice.wav", audio_bytes)
 
-        # Transcripción con Groq Whisper
         transcripcion = client_groq.audio.transcriptions.create(
             file=audio_file_tuple,
             model="whisper-large-v3-turbo",
             response_format="text"
         )
 
-        # Generación de respuesta con Gemini
         prompt = (
-            "Eres JARVIS, un asistente inteligente, directo y conciso. "
-            f"Responde de forma breve y clara en español a lo siguiente: {transcripcion}"
+            "Eres JARVIS, la Inteligencia Artificial de Tony Stark. Responde de forma muy concisa, respetuosa, "
+            "elegante y profesional, en español. Hablas como un asistente masculino sobrio. "
+            f"El usuario dice: {transcripcion}"
         )
         respuesta_gemini = client_gemini.models.generate_content(
             model="gemini-3.6-flash",
