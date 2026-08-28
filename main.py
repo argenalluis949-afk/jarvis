@@ -13,6 +13,18 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 app = FastAPI(title="J.A.R.V.I.S. HUD Interface")
+from fastapi.middleware.cors import CORSMiddleware
+
+# ... tu código de load_dotenv, app = FastAPI, etc ...
+
+# AÑADE ESTO JUSTO DESPUÉS DE CREAR LA APP:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Permite peticiones desde cualquier lugar
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Inicialización del cliente Groq
 GROQ_KEY = os.getenv("GROQ_API_KEY")
