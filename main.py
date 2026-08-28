@@ -132,46 +132,19 @@ def inicio():
                 line-height: 1.4;
             }
 
-            .controls-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 12px;
-                margin-top: 20px;
-                width: 100%;
-                max-width: 450px;
-            }
-
-            .btn-action {
+            .btn-start {
+                margin-top: 25px;
                 background: transparent;
                 border: 1px solid #38bdf8;
                 color: #38bdf8;
-                padding: 10px 24px;
+                padding: 12px 30px;
                 border-radius: 20px;
                 cursor: pointer;
-                letter-spacing: 1px;
+                letter-spacing: 2px;
                 transition: 0.3s;
                 font-family: inherit;
             }
-            .btn-action:hover { background: #38bdf8; color: #020617; box-shadow: 0 0 15px #38bdf8; }
-
-            .input-box {
-                display: flex;
-                gap: 8px;
-                width: 100%;
-            }
-
-            .text-input {
-                flex: 1;
-                background: rgba(15, 23, 42, 0.8);
-                border: 1px solid rgba(56, 189, 248, 0.4);
-                border-radius: 20px;
-                padding: 10px 16px;
-                color: #e0f2fe;
-                font-family: inherit;
-                outline: none;
-            }
-            .text-input:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
+            .btn-start:hover { background: #38bdf8; color: #020617; box-shadow: 0 0 15px #38bdf8; }
         </style>
     </head>
     <body>
@@ -194,23 +167,18 @@ def inicio():
         <div class="jarvis-widget">
             <div class="reactor-ring ring-1"></div>
             <div class="reactor-ring ring-2"></div>
-            <div id="orb" class="orb"></div>
+            <div id="orb" class="orb off"></div>
         </div>
 
-        <div id="statusText" class="status-display">SISTEMA LISTO</div>
-        <div id="responseText" class="response-text">Presione "Hablar con JARVIS" o escriba su comando.</div>
+        <div id="statusText" class="status-display">SISTEMA EN ESPERA</div>
+        <div id="responseText" class="response-text">Inicialice la interfaz neuronal.</div>
 
-        <div class="controls-container">
-            <button id="btnMic" class="btn-action" onclick="activarMicrofono()">HABLAR CON JARVIS</button>
-            <div class="input-box">
-                <input type="text" id="txtPrompt" class="text-input" placeholder="Escribe tu mensaje..." onkeypress="detectarEnter(event)">
-                <button class="btn-action" onclick="enviarTexto()">ENVIAR</button>
-            </div>
-        </div>
+        <button id="btnPower" class="btn-start" onclick="iniciarJARVIS()">INICIAR JARVIS</button>
 
         <script>
             let reconocedorVoz;
             let estaHablando = false;
+            let sistemaActivo = false;
 
             function actualizarReloj() {
                 const ahora = new Date();
@@ -235,7 +203,12 @@ def inicio():
                     utt.onend = () => {
                         estaHablando = false;
                         document.getElementById('orb').className = "orb";
-                        document.getElementById('statusText').innerText = "JARVIS ONLINE | EN ESPERA";
+                        document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
+                        
+                        // Reiniciar la escucha apenas termina de hablar
+                        if (sistemaActivo) {
+                            try { reconocedorVoz.start(); } catch(e){}
+                        }
                     };
 
                     window.speechSynthesis.speak(utt);
@@ -266,24 +239,29 @@ def inicio():
                 }
             }
 
-            function activarMicrofono() {
+            function iniciarJARVIS() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    alert("Utilice Google Chrome para el soporte de voz.");
+                    alert("Se requiere Google Chrome para el soporte de voz.");
                     return;
                 }
 
-                if (reconocedorVoz) {
-                    try { reconocedorVoz.stop(); } catch(e){}
-                }
+                sistemaActivo = true;
+                document.getElementById('btnPower').style.display = 'none';
+                document.getElementById('orb').className = "orb";
+                document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
+                document.getElementById('responseText').innerText = "Sistemas listos, señor.";
 
                 reconocedorVoz = new SpeechRecognition();
                 reconocedorVoz.lang = 'es-ES';
+                reconocedorVoz.continuous = false;
                 reconocedorVoz.interimResults = false;
 
                 reconocedorVoz.onstart = () => {
-                    document.getElementById('orb').className = "orb listening";
-                    document.getElementById('statusText').innerText = "ESCUCHANDO...";
+                    if (!estaHablando) {
+                        document.getElementById('orb').className = "orb listening";
+                        document.getElementById('statusText').innerText = "ESCUCHANDO...";
+                    }
                 };
 
                 reconocedorVoz.onresult = (event) => {
@@ -292,33 +270,18 @@ def inicio():
                 };
 
                 reconocedorVoz.onerror = (event) => {
-                    document.getElementById('orb').className = "orb";
-                    document.getElementById('statusText').innerText = "ERROR (" + event.error + ")";
-                };
-
-                reconocedorVoz.onend = () => {
-                    if (!estaHablando) {
-                        document.getElementById('orb').className = "orb";
-                        document.getElementById('statusText').innerText = "SISTEMA LISTO";
+                    if (sistemaActivo && !estaHablando) {
+                        setTimeout(() => { try { reconocedorVoz.start(); } catch(e){} }, 500);
                     }
                 };
 
-                reconocedorVoz.start();
-            }
+                reconocedorVoz.onend = () => {
+                    if (sistemaActivo && !estaHablando) {
+                        try { reconocedorVoz.start(); } catch(e){}
+                    }
+                };
 
-            function enviarTexto() {
-                const input = document.getElementById('txtPrompt');
-                const texto = input.value.trim();
-                if (texto) {
-                    procesarComando(texto);
-                    input.value = '';
-                }
-            }
-
-            function detectarEnter(e) {
-                if (e.key === 'Enter') {
-                    enviarTexto();
-                }
+                hablar("A su servicio, señor. Le escucho.");
             }
         </script>
     </body>
@@ -331,7 +294,8 @@ class EntradaTexto(BaseModel):
 @app.post("/procesar")
 async def procesar(data: EntradaTexto):
     if not client_gemini:
-        return {"respuesta": "Clave API no configurada."}
+        print("ERROR: GEMINI_KEY no está configurada.")
+        return {"respuesta": "Señor, la clave de API de Gemini no está configurada en el sistema."}
 
     prompt = (
         "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
@@ -341,16 +305,20 @@ async def procesar(data: EntradaTexto):
         f"El usuario dice: {data.texto}"
     )
 
-    modelos = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+    # Nombres de modelos actualizados para la librería google-genai
+    modelos = ["gemini-2.5-flash", "gemini-1.5-flash"]
 
     for modelo in modelos:
         try:
+            print(f"Enviando consulta a Gemini ({modelo})...")
             res = client_gemini.models.generate_content(
                 model=modelo,
                 contents=prompt
             )
+            print("Respuesta recibida correctamente.")
             return {"respuesta": res.text}
-        except Exception:
+        except Exception as e:
+            print(f"Error en {modelo}: {e}")
             continue
 
     return {"respuesta": "Señor, los servidores de enlace neuronal están temporalmente saturados. Por favor, reintente en un momento."}
