@@ -33,7 +33,7 @@ def inicio():
                 padding: 20px;
             }
 
-            /* Dashboard HUD */
+            /* Contenedor HUD Invisible por Defecto */
             .hud-grid {
                 display: flex;
                 gap: 15px;
@@ -42,37 +42,51 @@ def inicio():
                 justify-content: center;
                 width: 100%;
                 max-width: 800px;
+                opacity: 0;
+                transform: scale(0.2) translateY(-50px);
+                pointer-events: none;
+                transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+
+            /* Clase para Desplegar las Ventanas Holográficas */
+            .hud-grid.desplegar {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+                pointer-events: auto;
             }
 
             .hud-card {
-                background: rgba(15, 23, 42, 0.7);
-                border: 1px solid rgba(56, 189, 248, 0.3);
+                background: rgba(15, 23, 42, 0.85);
+                border: 1px solid rgba(56, 189, 248, 0.4);
                 border-radius: 12px;
-                padding: 12px 20px;
+                padding: 15px 25px;
                 text-align: center;
-                min-width: 160px;
-                backdrop-filter: blur(8px);
-                box-shadow: 0 0 15px rgba(56, 189, 248, 0.1);
-                transition: all 0.3s ease;
+                min-width: 180px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
+                animation: popIn 0.5s ease forwards;
             }
-            .hud-card:hover {
-                border-color: #38bdf8;
-                box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+
+            @keyframes popIn {
+                0% { opacity: 0; transform: scale(0.5); }
+                100% { opacity: 1; transform: scale(1); }
             }
+
             .hud-label {
-                font-size: 0.7rem;
-                color: #64748b;
-                letter-spacing: 1.5px;
+                font-size: 0.75rem;
+                color: #94a3b8;
+                letter-spacing: 2px;
                 text-transform: uppercase;
             }
             .hud-value {
-                font-size: 1.2rem;
+                font-size: 1.3rem;
                 font-weight: bold;
                 color: #38bdf8;
-                margin-top: 4px;
+                margin-top: 6px;
+                text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
             }
 
-            /* Widget Central */
+            /* Reactor Central */
             .jarvis-widget {
                 position: relative;
                 width: 240px;
@@ -119,9 +133,9 @@ def inicio():
 
             .response-text {
                 margin-top: 15px;
-                max-width: 500px;
+                max-width: 550px;
                 text-align: center;
-                font-size: 0.95rem;
+                font-size: 1rem;
                 color: #e0f2fe;
                 min-height: 45px;
                 line-height: 1.4;
@@ -143,8 +157,8 @@ def inicio():
     </head>
     <body>
 
-        <!-- PANELES DE INFORMACIÓN HUD -->
-        <div class="hud-grid">
+        <!-- PANELES OCULTOS HASTA RESPONDER -->
+        <div id="hudPanels" class="hud-grid">
             <div class="hud-card">
                 <div class="hud-label">SISTEMA / HORA</div>
                 <div id="valHora" class="hud-value">--:--:--</div>
@@ -166,7 +180,7 @@ def inicio():
         </div>
 
         <div id="statusText" class="status-display">SISTEMA OFFLINE</div>
-        <div id="responseText" class="response-text">Inicie el enlace para sincronizar módulos.</div>
+        <div id="responseText" class="response-text">Conecte el sistema para iniciar.</div>
 
         <button id="btnPower" class="btn-start" onclick="iniciarSistema()">CONECTAR SISTEMA</button>
 
@@ -200,12 +214,12 @@ def inicio():
                     sistemaConectado = true;
                     document.getElementById('btnPower').style.display = 'none';
                     document.getElementById('statusText').innerText = "EN ESPERA | DI 'HOLA JARVIS' O APLAUDE";
-                    document.getElementById('responseText').innerText = "Escuchando voz y sensores...";
+                    document.getElementById('responseText').innerText = "Escuchando sensores...";
 
                     iniciarSensorAplausos();
                     iniciarReconocimientoVoz();
                 } catch (err) {
-                    alert("Se requieren permisos de micrófono para operar.");
+                    alert("Permiso de micrófono requerido.");
                 }
             }
 
@@ -238,7 +252,7 @@ def inicio():
                 jarvisEncendido = true;
                 document.getElementById('orb').className = "orb";
                 document.getElementById('statusText').innerText = "JARVIS ONLINE | TE ESCUCHO";
-                hablar("A su servicio, señor. ¿En qué le puedo asistir?");
+                hablar("A su servicio, señor. ¿Qué desea consultar?");
             }
 
             function apagarJarvis() {
@@ -246,6 +260,7 @@ def inicio():
                 document.getElementById('orb').className = "orb off";
                 document.getElementById('statusText').innerText = "MODO ESPERA | DI 'HOLA JARVIS' O APLAUDE";
                 document.getElementById('responseText').innerText = "Sistemas en reposo.";
+                document.getElementById('hudPanels').classList.remove('desplegar');
             }
 
             function hablar(texto) {
@@ -278,7 +293,7 @@ def inicio():
             function iniciarReconocimientoVoz() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Navegador no compatible. Use Google Chrome.";
+                    document.getElementById('responseText').innerText = "Utilice Google Chrome.";
                     return;
                 }
 
@@ -303,6 +318,7 @@ def inicio():
                     if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
                         hablar("Desactivando interfaz. Hasta luego, señor.");
                         jarvisEncendido = false;
+                        document.getElementById('hudPanels').classList.remove('desplegar');
                         return;
                     }
 
@@ -318,7 +334,10 @@ def inicio():
                         });
                         const data = await res.json();
                         
+                        // DESPLEGAR PANTALLAS TRAS RECIBIR RESPUESTA
+                        document.getElementById('hudPanels').classList.add('desplegar');
                         document.getElementById('responseText').innerText = data.respuesta;
+                        
                         hablar(data.respuesta);
                     } catch (e) {
                         document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
@@ -348,9 +367,9 @@ async def procesar(data: EntradaTexto):
 
     prompt = (
         "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
-        "Responde a lo que pregunta el usuario en español con elegancia, precisión y profesionalismo. "
-        "Al finalizar tu respuesta, concluye SIEMPRE exactamente con la frase: "
-        "'Aquí le dejo información que puede gustarle señor, si gusta otra información puedo dársela.' "
+        "Responde a la duda o petición del usuario con elegancia, precisión y profesionalismo. "
+        "Al finalizar tu respuesta, concluye SIEMPRE de forma fluida agregando: "
+        "'Aquí le doy información que le puede interesar señor, si gusta otra información puedo dársela.' "
         f"El usuario dice: {data.texto}"
     )
 
