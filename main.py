@@ -1,13 +1,16 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from google import genai
-import os
 
 app = FastAPI()
 
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 client_gemini = genai.Client(api_key=GEMINI_KEY) if GEMINI_KEY else None
+
+class EntradaTexto(BaseModel):
+    texto: str
 
 @app.get("/", response_class=HTMLResponse)
 def inicio():
@@ -169,7 +172,6 @@ def inicio():
                 }
             }
 
-            // Detección opcional por aplausos
             function iniciarSensorAplausos() {
                 const bufferLength = analyser.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
@@ -219,6 +221,7 @@ def inicio():
 
                     utt.onstart = () => {
                         estaHablando = true;
+                        if (reconocedorVoz) try { reconocedorVoz.stop(); } catch(e){}
                         document.getElementById('orb').className = "orb speaking";
                     };
 
@@ -230,16 +233,30 @@ def inicio():
                         } else {
                             apagarJarvis();
                         }
+                        reiniciarReconocimiento();
+                    };
+
+                    utt.onerror = () => {
+                        estaHablando = false;
+                        reiniciarReconocimiento();
                     };
 
                     window.speechSynthesis.speak(utt);
                 }
             }
 
+            function reiniciarReconocimiento() {
+                if (sistemaConectado && reconocedorVoz) {
+                    setTimeout(() => {
+                        try { reconocedorVoz.start(); } catch(e){}
+                    }, 300);
+                }
+            }
+
             function iniciarReconocimientoVoz() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Tu navegador no soporta reconocimiento continuo. Usa Google Chrome.";
+                    document.getElementById('responseText').innerText = "Navegador no compatible. Usa Google Chrome.";
                     return;
                 }
 
@@ -256,7 +273,6 @@ def inicio():
 
                     console.log("Escuchado:", comando);
 
-                    // 1. SI ESTÁ APAGADO: Buscar comandos de activación por voz
                     if (!jarvisEncendido) {
                         if (comando.includes("hola jarvis") || comando.includes("jarvis") || comando.includes("despierta") || comando.includes("actívate") || comando.includes("activate")) {
                             encenderJarvis();
@@ -264,14 +280,12 @@ def inicio():
                         return;
                     }
 
-                    // 2. SI ESTÁ ENCENDIDO: Buscar comandos de apagado
                     if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
                         hablar("Desactivando sistemas. Hasta luego, señor.");
                         jarvisEncendido = false;
                         return;
                     }
 
-                    // 3. SI ESTÁ ENCENDIDO: Procesar pregunta normal con Gemini
                     document.getElementById('responseText').innerText = '"' + comando + '"';
                     document.getElementById('orb').className = "orb listening";
                     document.getElementById('statusText').innerText = "PROCESANDO...";
@@ -288,33 +302,37 @@ def inicio():
                         hablar(data.respuesta);
                     } catch (e) {
                         document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
+                        hablar("He experimentado una falla de comunicación con los servidores.");
                     }
                 };
 
                 reconocedorVoz.onend = () => {
-                    if (sistemaConectado) {
-                        try { reconocedorVoz.start(); } catch(e){}
+                    if (!estaHablando && sistemaConectado) {
+                        reiniciarReconocimiento();
                     }
                 };
 
-                reconocedorVoz.start();
+                reconocedorVoz.onerror = (e) => {
+                    if (e.error !== 'no-speech') {
+                        console.warn("Error reconocedor:", e.error);
+                    }
+                };
+
+                try { reconocedorVoz.start(); } catch(e){}
             }
         </script>
     </body>
     </html>
     """
 
-class EntradaTexto(BaseModel):
-    texto: str
-
 @app.post("/procesar")
 async def procesar(data: EntradaTexto):
     if not client_gemini:
-        return {"respuesta": "Clave API no configurada."}
+        return {"respuesta": "Clave API de Gemini no configurada en el servidor."}
 
     try:
         prompt = (
-            "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
+            "Eres J.A.R.V.I.S., la inteligencia artificial de Tony Stark. "
             "Responde de forma muy concisa (máximo 2 oraciones), extremadamente elegante, educada, sobria y profesional, en español. "
             f"El usuario dice: {data.texto}"
         )
