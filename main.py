@@ -170,12 +170,12 @@ def inicio():
         </div>
 
         <div id="statusText" class="status-display">SISTEMA OFFLINE</div>
-        <div id="responseText" class="response-text">Conecte el sistema para iniciar.</div>
+        <div id="responseText" class="response-text">Presione para calibrar alta sensibilidad.</div>
 
         <button id="btnPower" class="btn-start" onclick="iniciarSistema()">CONECTAR SISTEMA</button>
 
         <script>
-            let audioCtx, analyser, micStream;
+            let audioCtx, analyser, micStream, gainNode;
             let sistemaConectado = false;
             let jarvisEncendido = false;
             let reconocedorVoz;
@@ -193,27 +193,40 @@ def inicio():
                 if (sistemaConectado) return;
 
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // Solicita entrada directa sin filtros de supresión agresivos para captar tonos bajos
+                    micStream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: false,
+                            autoGainControl: true
+                        } 
+                    });
+
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    
                     if (audioCtx.state === 'suspended') {
                         await audioCtx.resume();
                     }
 
+                    // Pre-amplificador para aumentar volumen de voces bajas
+                    gainNode = audioCtx.createGain();
+                    gainNode.gain.value = 2.5; // Amplificación al 250%
+
                     analyser = audioCtx.createAnalyser();
                     const source = audioCtx.createMediaStreamSource(micStream);
+                    
+                    source.connect(gainNode);
+                    gainNode.connect(analyser);
                     analyser.fftSize = 256;
-                    source.connect(analyser);
 
                     sistemaConectado = true;
                     document.getElementById('btnPower').style.display = 'none';
-                    document.getElementById('statusText').innerText = "EN ESPERA | DI 'HOLA JARVIS' O APLAUDE";
-                    document.getElementById('responseText').innerText = "Escuchando...";
+                    document.getElementById('statusText').innerText = "SENSORES DE ALTA SENSIBILIDAD ACTIVOS";
+                    document.getElementById('responseText').innerText = "Puedes hablar suavemente o aplaudir...";
 
                     iniciarSensorAplausos();
                     iniciarReconocimientoVoz();
                 } catch (err) {
-                    alert("Se requieren permisos de micrófono. Asegúrate de usar Chrome.");
+                    alert("Asegúrate de conceder permisos de micrófono en Google Chrome.");
                 }
             }
 
@@ -228,7 +241,8 @@ def inicio():
                         for (let i = 0; i < bufferLength; i++) suma += dataArray[i];
                         let promedio = suma / bufferLength;
 
-                        if (promedio > 90) {
+                        // Umbral ajustado por amplificación previa
+                        if (promedio > 110) {
                             let ahora = Date.now();
                             if (ahora - ultimoPico < 600 && ahora - ultimoPico > 150) {
                                 encenderJarvis();
@@ -245,8 +259,8 @@ def inicio():
                 if (jarvisEncendido) return;
                 jarvisEncendido = true;
                 document.getElementById('orb').className = "orb";
-                document.getElementById('statusText').innerText = "JARVIS ONLINE | TE ESCUCHO";
-                hablar("A su servicio, señor. ¿En qué le puedo asistir?");
+                document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO AUDIOS BAJOS";
+                hablar("Sistemas a su disposición, señor. Le escucho.");
             }
 
             function apagarJarvis() {
@@ -287,65 +301,75 @@ def inicio():
             function iniciarReconocimientoVoz() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Navegador no compatible. Utilice Google Chrome.";
+                    document.getElementById('responseText').innerText = "Navegador no compatible. Debe usar Google Chrome.";
                     return;
                 }
 
                 reconocedorVoz = new SpeechRecognition();
                 reconocedorVoz.continuous = true;
                 reconocedorVoz.lang = 'es-ES';
-                reconocedorVoz.interimResults = false;
+                reconocedorVoz.interimResults = true; // Captura palabras intermedias aun si hablas despacio
 
                 reconocedorVoz.onresult = async (event) => {
                     if (estaHablando) return;
 
-                    const index = event.results.length - 1;
-                    const comando = event.results[index][0].transcript.trim().toLowerCase();
+                    let textoEscuchado = "";
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        textoEscuchado += event.results[i][0].transcript;
+                    }
+
+                    const comando = textoEscuchado.trim().toLowerCase();
+                    if (!comando) return;
+
+                    // Muestra en tiempo real lo que está escuchando en pantalla
+                    document.getElementById('responseText').innerText = '"' + comando + '"';
 
                     if (!jarvisEncendido) {
-                        if (comando.includes("hola jarvis") || comando.includes("jarvis") || comando.includes("despierta") || comando.includes("actívate") || comando.includes("activate")) {
+                        if (comando.includes("hola jarvis") || comando.includes("jarvis") || comando.includes("despierta") || comando.includes("actívate") || comando.includes("activate") || comando.includes("hola")) {
                             encenderJarvis();
                         }
                         return;
                     }
 
-                    if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
-                        hablar("Desactivando interfaz. Hasta luego, señor.");
-                        jarvisEncendido = false;
-                        document.getElementById('hudPanels').classList.remove('desplegar');
-                        return;
-                    }
+                    // Solo procesa llamadas finales completas al servidor
+                    if (event.results[event.results.length - 1].isFinal) {
+                        if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
+                            hablar("Desactivando interfaz. Hasta luego, señor.");
+                            jarvisEncendido = false;
+                            document.getElementById('hudPanels').classList.remove('desplegar');
+                            return;
+                        }
 
-                    document.getElementById('responseText').innerText = '"' + comando + '"';
-                    document.getElementById('orb').className = "orb listening";
-                    document.getElementById('statusText').innerText = "PROCESANDO...";
+                        document.getElementById('orb').className = "orb listening";
+                        document.getElementById('statusText').innerText = "PROCESANDO...";
 
-                    try {
-                        const res = await fetch("/procesar", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ texto: comando })
-                        });
-                        const data = await res.json();
-                        
-                        document.getElementById('hudPanels').classList.add('desplegar');
-                        document.getElementById('responseText').innerText = data.respuesta;
-                        
-                        hablar(data.respuesta);
-                    } catch (e) {
-                        document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
+                        try {
+                            const res = await fetch("/procesar", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ texto: comando })
+                            });
+                            const data = await res.json();
+                            
+                            document.getElementById('hudPanels').classList.add('desplegar');
+                            document.getElementById('responseText').innerText = data.respuesta;
+                            
+                            hablar(data.respuesta);
+                        } catch (e) {
+                            document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
+                        }
                     }
                 };
 
-                reconocedorVoz.onerror = (e) => {
+                reconocedorVoz.onerror = () => {
                     if (sistemaConectado && !estaHablando) {
-                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 1000);
+                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 300);
                     }
                 };
 
                 reconocedorVoz.onend = () => {
                     if (sistemaConectado && !estaHablando) {
-                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 500);
+                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 300);
                     }
                 };
 
