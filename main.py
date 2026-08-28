@@ -33,7 +33,6 @@ def inicio():
                 padding: 20px;
             }
 
-            /* Contenedor HUD Invisible por Defecto */
             .hud-grid {
                 display: flex;
                 gap: 15px;
@@ -48,7 +47,6 @@ def inicio():
                 transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             }
 
-            /* Clase para Desplegar las Ventanas Holográficas */
             .hud-grid.desplegar {
                 opacity: 1;
                 transform: scale(1) translateY(0);
@@ -64,12 +62,6 @@ def inicio():
                 min-width: 180px;
                 backdrop-filter: blur(10px);
                 box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
-                animation: popIn 0.5s ease forwards;
-            }
-
-            @keyframes popIn {
-                0% { opacity: 0; transform: scale(0.5); }
-                100% { opacity: 1; transform: scale(1); }
             }
 
             .hud-label {
@@ -86,7 +78,6 @@ def inicio():
                 text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
             }
 
-            /* Reactor Central */
             .jarvis-widget {
                 position: relative;
                 width: 240px;
@@ -157,7 +148,6 @@ def inicio():
     </head>
     <body>
 
-        <!-- PANELES OCULTOS HASTA RESPONDER -->
         <div id="hudPanels" class="hud-grid">
             <div class="hud-card">
                 <div class="hud-label">SISTEMA / HORA</div>
@@ -205,8 +195,12 @@ def inicio():
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    analyser = audioCtx.createAnalyser();
                     
+                    if (audioCtx.state === 'suspended') {
+                        await audioCtx.resume();
+                    }
+
+                    analyser = audioCtx.createAnalyser();
                     const source = audioCtx.createMediaStreamSource(micStream);
                     analyser.fftSize = 256;
                     source.connect(analyser);
@@ -214,12 +208,12 @@ def inicio():
                     sistemaConectado = true;
                     document.getElementById('btnPower').style.display = 'none';
                     document.getElementById('statusText').innerText = "EN ESPERA | DI 'HOLA JARVIS' O APLAUDE";
-                    document.getElementById('responseText').innerText = "Escuchando sensores...";
+                    document.getElementById('responseText').innerText = "Escuchando...";
 
                     iniciarSensorAplausos();
                     iniciarReconocimientoVoz();
                 } catch (err) {
-                    alert("Permiso de micrófono requerido.");
+                    alert("Se requieren permisos de micrófono. Asegúrate de usar Chrome.");
                 }
             }
 
@@ -234,7 +228,7 @@ def inicio():
                         for (let i = 0; i < bufferLength; i++) suma += dataArray[i];
                         let promedio = suma / bufferLength;
 
-                        if (promedio > 85) {
+                        if (promedio > 90) {
                             let ahora = Date.now();
                             if (ahora - ultimoPico < 600 && ahora - ultimoPico > 150) {
                                 encenderJarvis();
@@ -252,7 +246,7 @@ def inicio():
                 jarvisEncendido = true;
                 document.getElementById('orb').className = "orb";
                 document.getElementById('statusText').innerText = "JARVIS ONLINE | TE ESCUCHO";
-                hablar("A su servicio, señor. ¿Qué desea consultar?");
+                hablar("A su servicio, señor. ¿En qué le puedo asistir?");
             }
 
             function apagarJarvis() {
@@ -293,7 +287,7 @@ def inicio():
             function iniciarReconocimientoVoz() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Utilice Google Chrome.";
+                    document.getElementById('responseText').innerText = "Navegador no compatible. Utilice Google Chrome.";
                     return;
                 }
 
@@ -334,7 +328,6 @@ def inicio():
                         });
                         const data = await res.json();
                         
-                        // DESPLEGAR PANTALLAS TRAS RECIBIR RESPUESTA
                         document.getElementById('hudPanels').classList.add('desplegar');
                         document.getElementById('responseText').innerText = data.respuesta;
                         
@@ -344,13 +337,19 @@ def inicio():
                     }
                 };
 
-                reconocedorVoz.onend = () => {
-                    if (sistemaConectado) {
-                        try { reconocedorVoz.start(); } catch(e){}
+                reconocedorVoz.onerror = (e) => {
+                    if (sistemaConectado && !estaHablando) {
+                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 1000);
                     }
                 };
 
-                reconocedorVoz.start();
+                reconocedorVoz.onend = () => {
+                    if (sistemaConectado && !estaHablando) {
+                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 500);
+                    }
+                };
+
+                try { reconocedorVoz.start(); } catch(e){}
             }
         </script>
     </body>
@@ -367,8 +366,8 @@ async def procesar(data: EntradaTexto):
 
     prompt = (
         "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
-        "Responde a la duda o petición del usuario con elegancia, precisión y profesionalismo. "
-        "Al finalizar tu respuesta, concluye SIEMPRE de forma fluida agregando: "
+        "Responde a la duda o petición del usuario en español con elegancia y concisión. "
+        "Al finalizar tu respuesta, concluye SIEMPRE de forma fluida agregando la frase: "
         "'Aquí le doy información que le puede interesar señor, si gusta otra información puedo dársela.' "
         f"El usuario dice: {data.texto}"
     )
