@@ -29,15 +29,55 @@ def inicio():
                 align-items: center; 
                 justify-content: center; 
                 min-height: 100vh; 
-                overflow: hidden;
+                overflow-x: hidden;
+                padding: 20px;
             }
 
+            /* Dashboard HUD */
+            .hud-grid {
+                display: flex;
+                gap: 15px;
+                margin-bottom: 25px;
+                flex-wrap: wrap;
+                justify-content: center;
+                width: 100%;
+                max-width: 800px;
+            }
+
+            .hud-card {
+                background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(56, 189, 248, 0.3);
+                border-radius: 12px;
+                padding: 12px 20px;
+                text-align: center;
+                min-width: 160px;
+                backdrop-filter: blur(8px);
+                box-shadow: 0 0 15px rgba(56, 189, 248, 0.1);
+                transition: all 0.3s ease;
+            }
+            .hud-card:hover {
+                border-color: #38bdf8;
+                box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+            }
+            .hud-label {
+                font-size: 0.7rem;
+                color: #64748b;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+            }
+            .hud-value {
+                font-size: 1.2rem;
+                font-weight: bold;
+                color: #38bdf8;
+                margin-top: 4px;
+            }
+
+            /* Widget Central */
             .jarvis-widget {
                 position: relative;
-                width: 300px;
-                height: 300px;
+                width: 240px;
+                height: 240px;
                 display: flex;
-                flex-direction: column;
                 align-items: center;
                 justify-content: center;
             }
@@ -46,14 +86,13 @@ def inicio():
                 position: absolute;
                 border-radius: 50%;
                 border: 2px dashed rgba(56, 189, 248, 0.3);
-                transition: all 0.5s ease;
             }
-            .ring-1 { width: 280px; height: 280px; animation: spin 20s linear infinite; }
-            .ring-2 { width: 220px; height: 220px; border: 2px solid rgba(56, 189, 248, 0.5); border-top-color: transparent; animation: spinRev 10s linear infinite; }
+            .ring-1 { width: 230px; height: 230px; animation: spin 20s linear infinite; }
+            .ring-2 { width: 180px; height: 180px; border: 2px solid rgba(56, 189, 248, 0.5); border-top-color: transparent; animation: spinRev 10s linear infinite; }
 
             .orb {
-                width: 130px;
-                height: 130px;
+                width: 110px;
+                height: 110px;
                 border-radius: 50%;
                 background: radial-gradient(circle, #38bdf8 0%, #0284c7 60%, #0f172a 100%);
                 box-shadow: 0 0 50px rgba(56, 189, 248, 0.4);
@@ -61,70 +100,64 @@ def inicio():
                 transition: all 0.4s ease;
                 z-index: 5;
             }
+            .orb.off { background: radial-gradient(circle, #334155 0%, #0f172a 100%); box-shadow: none; }
+            .orb.speaking { animation: float 1.5s ease-in-out infinite, pulse 0.3s ease-in-out infinite alternate; box-shadow: 0 0 80px #38bdf8; }
+            .orb.listening { background: radial-gradient(circle, #f43f5e 0%, #be123c 100%); box-shadow: 0 0 60px #f43f5e; }
 
-            .orb.off {
-                background: radial-gradient(circle, #334155 0%, #0f172a 100%);
-                box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
-            }
-            .orb.speaking {
-                animation: float 1.5s ease-in-out infinite, pulse 0.3s ease-in-out infinite alternate;
-                background: radial-gradient(circle, #bae6fd 0%, #38bdf8 50%, #0284c7 100%);
-                box-shadow: 0 0 80px #38bdf8;
-            }
-            .orb.listening {
-                background: radial-gradient(circle, #f43f5e 0%, #be123c 100%);
-                box-shadow: 0 0 60px #f43f5e;
-            }
-
-            @keyframes float {
-                0%, 100% { transform: translateY(0px); }
-                50% { transform: translateY(-15px); }
-            }
-            @keyframes pulse {
-                0% { transform: scale(0.95); }
-                100% { transform: scale(1.1); }
-            }
+            @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+            @keyframes pulse { 0% { transform: scale(0.95); } 100% { transform: scale(1.1); } }
             @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             @keyframes spinRev { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 
             .status-display {
-                margin-top: 30px;
-                font-size: 0.85rem;
+                margin-top: 20px;
+                font-size: 0.8rem;
                 letter-spacing: 2px;
-                text-transform: uppercase;
                 color: #94a3b8;
                 text-align: center;
-                height: 20px;
             }
 
             .response-text {
                 margin-top: 15px;
-                max-width: 450px;
+                max-width: 500px;
                 text-align: center;
-                font-size: 1rem;
+                font-size: 0.95rem;
                 color: #e0f2fe;
-                min-height: 50px;
+                min-height: 45px;
+                line-height: 1.4;
             }
 
             .btn-start {
-                margin-top: 25px;
+                margin-top: 20px;
                 background: transparent;
                 border: 1px solid #38bdf8;
                 color: #38bdf8;
-                padding: 10px 20px;
+                padding: 10px 24px;
                 border-radius: 20px;
                 cursor: pointer;
                 letter-spacing: 1px;
                 transition: 0.3s;
             }
-            .btn-start:hover {
-                background: #38bdf8;
-                color: #020617;
-                box-shadow: 0 0 15px #38bdf8;
-            }
+            .btn-start:hover { background: #38bdf8; color: #020617; box-shadow: 0 0 15px #38bdf8; }
         </style>
     </head>
     <body>
+
+        <!-- PANELES DE INFORMACIÓN HUD -->
+        <div class="hud-grid">
+            <div class="hud-card">
+                <div class="hud-label">SISTEMA / HORA</div>
+                <div id="valHora" class="hud-value">--:--:--</div>
+            </div>
+            <div class="hud-card">
+                <div class="hud-label">USD / HNL</div>
+                <div id="valDolar" class="hud-value">L. 25.40</div>
+            </div>
+            <div class="hud-card">
+                <div class="hud-label">ESTADO CLIMA</div>
+                <div id="valClima" class="hud-value">28°C HND</div>
+            </div>
+        </div>
 
         <div class="jarvis-widget">
             <div class="reactor-ring ring-1"></div>
@@ -133,7 +166,7 @@ def inicio():
         </div>
 
         <div id="statusText" class="status-display">SISTEMA OFFLINE</div>
-        <div id="responseText" class="response-text">Presiona "Conectar" para iniciar.</div>
+        <div id="responseText" class="response-text">Inicie el enlace para sincronizar módulos.</div>
 
         <button id="btnPower" class="btn-start" onclick="iniciarSistema()">CONECTAR SISTEMA</button>
 
@@ -144,6 +177,13 @@ def inicio():
             let reconocedorVoz;
             let estaHablando = false;
             let ultimoPico = 0;
+
+            function actualizarReloj() {
+                const ahora = new Date();
+                document.getElementById('valHora').innerText = ahora.toLocaleTimeString();
+            }
+            setInterval(actualizarReloj, 1000);
+            actualizarReloj();
 
             async function iniciarSistema() {
                 if (sistemaConectado) return;
@@ -160,16 +200,15 @@ def inicio():
                     sistemaConectado = true;
                     document.getElementById('btnPower').style.display = 'none';
                     document.getElementById('statusText').innerText = "EN ESPERA | DI 'HOLA JARVIS' O APLAUDE";
-                    document.getElementById('responseText').innerText = "Escuchando voz y aplausos...";
+                    document.getElementById('responseText').innerText = "Escuchando voz y sensores...";
 
                     iniciarSensorAplausos();
                     iniciarReconocimientoVoz();
                 } catch (err) {
-                    alert("Se requiere permiso de micrófono para funcionar.");
+                    alert("Se requieren permisos de micrófono para operar.");
                 }
             }
 
-            // Detección opcional por aplausos
             function iniciarSensorAplausos() {
                 const bufferLength = analyser.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
@@ -199,7 +238,7 @@ def inicio():
                 jarvisEncendido = true;
                 document.getElementById('orb').className = "orb";
                 document.getElementById('statusText').innerText = "JARVIS ONLINE | TE ESCUCHO";
-                hablar("A su servicio, señor. ¿Qué necesita?");
+                hablar("A su servicio, señor. ¿En qué le puedo asistir?");
             }
 
             function apagarJarvis() {
@@ -239,7 +278,7 @@ def inicio():
             function iniciarReconocimientoVoz() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Tu navegador no soporta reconocimiento continuo. Usa Google Chrome.";
+                    document.getElementById('responseText').innerText = "Navegador no compatible. Use Google Chrome.";
                     return;
                 }
 
@@ -254,9 +293,6 @@ def inicio():
                     const index = event.results.length - 1;
                     const comando = event.results[index][0].transcript.trim().toLowerCase();
 
-                    console.log("Escuchado:", comando);
-
-                    // 1. SI ESTÁ APAGADO: Buscar comandos de activación por voz
                     if (!jarvisEncendido) {
                         if (comando.includes("hola jarvis") || comando.includes("jarvis") || comando.includes("despierta") || comando.includes("actívate") || comando.includes("activate")) {
                             encenderJarvis();
@@ -264,14 +300,12 @@ def inicio():
                         return;
                     }
 
-                    // 2. SI ESTÁ ENCENDIDO: Buscar comandos de apagado
                     if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
-                        hablar("Desactivando sistemas. Hasta luego, señor.");
+                        hablar("Desactivando interfaz. Hasta luego, señor.");
                         jarvisEncendido = false;
                         return;
                     }
 
-                    // 3. SI ESTÁ ENCENDIDO: Procesar pregunta normal con Gemini
                     document.getElementById('responseText').innerText = '"' + comando + '"';
                     document.getElementById('orb').className = "orb listening";
                     document.getElementById('statusText').innerText = "PROCESANDO...";
@@ -312,16 +346,24 @@ async def procesar(data: EntradaTexto):
     if not client_gemini:
         return {"respuesta": "Clave API no configurada."}
 
-    try:
-        prompt = (
-            "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
-            "Responde de forma muy concisa (máximo 2 oraciones), extremadamente elegante, educada, sobria y profesional, en español. "
-            f"El usuario dice: {data.texto}"
-        )
-        res = client_gemini.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt
-        )
-        return {"respuesta": res.text}
-    except Exception as e:
-        return {"respuesta": f"Fallo en los circuitos principales: {str(e)}"}
+    prompt = (
+        "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
+        "Responde a lo que pregunta el usuario en español con elegancia, precisión y profesionalismo. "
+        "Al finalizar tu respuesta, concluye SIEMPRE exactamente con la frase: "
+        "'Aquí le dejo información que puede gustarle señor, si gusta otra información puedo dársela.' "
+        f"El usuario dice: {data.texto}"
+    )
+
+    modelos = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+
+    for modelo in modelos:
+        try:
+            res = client_gemini.models.generate_content(
+                model=modelo,
+                contents=prompt
+            )
+            return {"respuesta": res.text}
+        except Exception:
+            continue
+
+    return {"respuesta": "Señor, los servidores de enlace neuronal están temporalmente saturados. Por favor, reintente en un momento."}
