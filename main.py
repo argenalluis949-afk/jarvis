@@ -3,14 +3,15 @@ from fastapi.responses import HTMLResponse
 from google import genai
 from groq import Groq
 import os
+import io
 
 app = FastAPI()
 
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 GROQ_KEY = os.getenv("GROQ_KEY")
 
-client_gemini = genai.Client(api_key=GEMINI_KEY)
-client_groq = Groq(api_key=GROQ_KEY)
+client_gemini = genai.Client(api_key=GEMINI_KEY) if GEMINI_KEY else None
+client_groq = Groq(api_key=GROQ_KEY) if GROQ_KEY else None
 
 @app.get("/", response_class=HTMLResponse)
 def inicio():
@@ -80,27 +81,34 @@ def inicio():
 
 @app.post("/jarvis")
 async def procesar_audio(file: UploadFile = File(...)):
-    audio_path = f"temp_{file.filename}"
-    with open(audio_path, "wb") as f:
-        f.write(await file.read())
+    if not client_gemini or not client_groq:
+        return {"escuchado": "Error", "respuesta_jarvis": "Faltan las claves API en Vercel."}
 
-    with open(audio_path, "rb") as audio_file:
+    try:
+        # Lectura directa en memoria (sin crear archivos en el disco)
+        audio_bytes = await file.read()
+        audio_file_tuple = ("voice.wav", audio_bytes)
+
+        # Transcripción directa con Groq
         transcripcion = client_groq.audio.transcriptions.create(
-            file=(audio_path, audio_file.read()),
+            file=audio_file_tuple,
             model="whisper-large-v3-turbo",
             response_format="text"
         )
 
-    if os.path.exists(audio_path):
-        os.remove(audio_path)
+        # Respuesta con Gemini
+        prompt = f"Eres JARVIS, un asistente inteligente y conciso. Responde en español a esto: {transcripcion}"
+        respuesta_gemini = client_gemini.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
 
-    prompt = f"Eres JARVIS, un asistente inteligente y conciso. Responde en español a esto: {transcripcion}"
-    respuesta_gemini = client_gemini.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
-
-    return {
-        "escuchado": transcripcion,
-        "respuesta_jarvis": respuesta_gemini.text
-    }
+        return {
+            "escuchado": transcripcion,
+            "respuesta_jarvis": respuesta_gemini.text
+        }
+    except Exception as e:
+        return {
+            "escuchado": "Error en el servidor",
+            "respuesta_jarvis": f"Detalle: {str(e)}"
+        }
