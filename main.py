@@ -1,16 +1,17 @@
 import os
+import logging
+import traceback
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
-import logging
 
-# Configurar logs
+# Configurar logs para ver TODO en Vercel
 logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI(title="J.A.R.V.I.S. HUD Interface")
 
-# Añadir CORS
+# Permitir peticiones desde cualquier origen (vital para Vercel)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,67 +20,59 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Verificar la clave de Groq
+# Inicializar Groq
 GROQ_KEY = os.getenv("GROQ_API_KEY")
-logging.info(f"GROQ_API_KEY encontrada: {'Sí' if GROQ_KEY else 'No'}")
-
-if not GROQ_KEY:
-    logging.error("ERROR: GROQ_API_KEY no está configurada en Vercel")
+logging.info(f"¿GROQ_API_KEY encontrada?: {'SÍ' if GROQ_KEY else 'NO'}")
 
 client_groq = Groq(api_key=GROQ_KEY) if GROQ_KEY else None
-
-# 🧠 MEMORIA: Historial de conversación para que JARVIS recuerde el contexto
-historial_conversacion = [
-    {
-        "role": "system",
-        "content": "Eres J.A.R.V.I.S., la inteligencia artificial avanzada de Tony Stark. Responde de forma concisa (máximo 2 oraciones), extremadamente elegante, educada y profesional en español. Siempre llamas al usuario 'señor'."
-    }
-]
 
 class EntradaTexto(BaseModel):
     texto: str
 
-@app.get("/", response_class=HTMLResponse)
+# Historial básico para que recuerde el contexto
+historial = [
+    {"role": "system", "content": "Eres J.A.R.V.I.S. Responde de forma concisa (máximo 2 oraciones), elegante, educada y profesional en español. Llama al usuario 'señor'."}
+]
+
+@app.get("/")
 async def inicio():
-    # Leer el HTML desde la carpeta static
     try:
         with open("static/index.html", "r", encoding="utf-8") as f:
             return f.read()
-    except FileNotFoundError:
-        logging.error("No se encontró static/index.html")
-        return "<h1>Error: No se encontró el archivo de interfaz.</h1>"
+    except Exception as e:
+        logging.error(f"Error leyendo index.html: {e}")
+        return {"error": "No se encontró static/index.html"}
 
 @app.post("/procesar")
 async def procesar(data: EntradaTexto):
+    logging.info(f"Petición recibida: {data.texto}")
+    
     if not client_groq:
-        return {"respuesta": "Clave GROQ_API_KEY no configurada en el servidor."}
+        logging.error("ERROR CRÍTICO: GROQ_API_KEY no está en las variables de entorno de Vercel.")
+        return {"respuesta": "Señor, la clave de acceso al núcleo no está configurada."}
 
-    # Añadir el mensaje del usuario al historial
-    historial_conversacion.append({"role": "user", "content": data.texto})
+    historial.append({"role": "user", "content": data.texto})
 
     try:
-        # Nota: Si sientes que tarda mucho, cambia el modelo a "llama-3.1-8b-instant"
+        logging.info("Llamando a la API de Groq...")
         completion = client_groq.chat.completions.create(
-            model="llama-3.3-70b-versatile", 
-            messages=historial_conversacion,
+            model="llama-3.3-70b-versatile",
+            messages=historial,
             temperature=0.6,
             max_tokens=150
         )
         
         respuesta = completion.choices[0].message.content
+        historial.append({"role": "assistant", "content": respuesta})
         
-        # Añadir la respuesta de JARVIS al historial
-        historial_conversacion.append({"role": "assistant", "content": respuesta})
-        
-        # Limitar el historial a las últimas 10 conversaciones para no saturar la API
-        if len(historial_conversacion) > 21: 
-            historial_conversacion = [historial_conversacion[0]] + historial_conversacion[-20:]
-
+        # Mantener el historial corto para no saturar
+        if len(historial) > 15:
+            historial = [historial[0]] + historial[-14:]
+            
         return {"respuesta": respuesta}
         
     except Exception as e:
-        logging.error(f"Error en Groq: {str(e)}")
+        # ESTO ES LO QUE NOS SALVARÁ: Imprime el error exacto en los logs de Vercel
+        logging.error(f"ERROR EN GROQ: {str(e)}")
+        logging.error(f"TRACEBACK: {traceback.format_exc()}")
         return {"respuesta": "Señor, he detectado una anomalía en el procesamiento central."}
-
-# Añadir esto al final:
-app = app
