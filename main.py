@@ -1,14 +1,18 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import google.generativeai as genai
-import os
+from google import genai
 
 app = FastAPI()
 
-GEMINI_KEY = os.getenv("GEMINI_KEY")
-if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
+# Pega tu API Key directamente entre las comillas
+API_KEY = "AQ.Ab8RN6ITAg5KbyR8C_hPa2XIQ106q_qqe72ro43GADTXm0MQng"
+
+try:
+    client_gemini = genai.Client(api_key=API_KEY)
+except Exception as e:
+    client_gemini = None
+    print(f"Error al inicializar cliente: {e}")
 
 @app.get("/", response_class=HTMLResponse)
 def inicio():
@@ -18,7 +22,7 @@ def inicio():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>J.A.R.V.I.S. HUD</title>
+        <title>J.A.R.V.I.S.</title>
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body { 
@@ -30,75 +34,13 @@ def inicio():
                 align-items: center; 
                 justify-content: center; 
                 min-height: 100vh; 
-                overflow-x: hidden;
                 padding: 20px;
-            }
-
-            /* Contenedor principal de pantallas */
-            .hud-grid {
-                display: flex;
-                gap: 15px;
-                margin-bottom: 25px;
-                flex-wrap: wrap;
-                justify-content: center;
-                width: 100%;
-                max-width: 800px;
-                max-height: 0;
-                opacity: 0;
-                overflow: hidden;
-                transition: max-height 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease-in-out;
-            }
-
-            /* Estado cuando JARVIS activa el despliegue */
-            .hud-grid.desplegar {
-                max-height: 200px;
-                opacity: 1;
-            }
-
-            /* Tarjetas individuales con efecto de apertura y rotación 3D */
-            .hud-card {
-                background: rgba(15, 23, 42, 0.85);
-                border: 1px solid rgba(56, 189, 248, 0.4);
-                border-radius: 12px;
-                padding: 15px 25px;
-                text-align: center;
-                min-width: 180px;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
-                transform: scaleY(0) translateY(-20px) rotateX(-90deg);
-                opacity: 0;
-                transform-origin: top center;
-                transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
-            }
-
-            /* Despliegue en cascada de cada panel */
-            .hud-grid.desplegar .hud-card {
-                transform: scaleY(1) translateY(0) rotateX(0deg);
-                opacity: 1;
-            }
-
-            .hud-grid.desplegar .hud-card:nth-child(1) { transition-delay: 0.1s; }
-            .hud-grid.desplegar .hud-card:nth-child(2) { transition-delay: 0.25s; }
-            .hud-grid.desplegar .hud-card:nth-child(3) { transition-delay: 0.4s; }
-
-            .hud-label {
-                font-size: 0.75rem;
-                color: #94a3b8;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-            }
-            .hud-value {
-                font-size: 1.3rem;
-                font-weight: bold;
-                color: #38bdf8;
-                margin-top: 6px;
-                text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
             }
 
             .jarvis-widget {
                 position: relative;
-                width: 240px;
-                height: 240px;
+                width: 220px;
+                height: 220px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -109,31 +51,30 @@ def inicio():
                 border-radius: 50%;
                 border: 2px dashed rgba(56, 189, 248, 0.3);
             }
-            .ring-1 { width: 230px; height: 230px; animation: spin 20s linear infinite; }
-            .ring-2 { width: 180px; height: 180px; border: 2px solid rgba(56, 189, 248, 0.5); border-top-color: transparent; animation: spinRev 10s linear infinite; }
+            .ring-1 { width: 210px; height: 210px; animation: spin 20s linear infinite; }
+            .ring-2 { width: 160px; height: 160px; border: 2px solid rgba(56, 189, 248, 0.5); border-top-color: transparent; animation: spinRev 10s linear infinite; }
 
             .orb {
-                width: 110px;
-                height: 110px;
+                width: 100px;
+                height: 100px;
                 border-radius: 50%;
                 background: radial-gradient(circle, #38bdf8 0%, #0284c7 60%, #0f172a 100%);
-                box-shadow: 0 0 50px rgba(56, 189, 248, 0.4);
+                box-shadow: 0 0 40px rgba(56, 189, 248, 0.4);
                 animation: float 3.5s ease-in-out infinite;
                 transition: all 0.4s ease;
                 z-index: 5;
             }
-            .orb.off { background: radial-gradient(circle, #334155 0%, #0f172a 100%); box-shadow: none; }
-            .orb.speaking { animation: float 1.5s ease-in-out infinite, pulse 0.3s ease-in-out infinite alternate; box-shadow: 0 0 80px #38bdf8; }
-            .orb.listening { background: radial-gradient(circle, #f43f5e 0%, #be123c 100%); box-shadow: 0 0 60px #f43f5e; }
+            .orb.speaking { animation: float 1.5s ease-in-out infinite, pulse 0.3s ease-in-out infinite alternate; box-shadow: 0 0 70px #38bdf8; }
+            .orb.listening { background: radial-gradient(circle, #f43f5e 0%, #be123c 100%); box-shadow: 0 0 50px #f43f5e; }
 
-            @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+            @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
             @keyframes pulse { 0% { transform: scale(0.95); } 100% { transform: scale(1.1); } }
             @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             @keyframes spinRev { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 
             .status-display {
-                margin-top: 20px;
-                font-size: 0.8rem;
+                margin-top: 25px;
+                font-size: 0.85rem;
                 letter-spacing: 2px;
                 color: #94a3b8;
                 text-align: center;
@@ -143,14 +84,14 @@ def inicio():
                 margin-top: 15px;
                 max-width: 550px;
                 text-align: center;
-                font-size: 1rem;
+                font-size: 1.05rem;
                 color: #e0f2fe;
                 min-height: 45px;
-                line-height: 1.4;
+                line-height: 1.5;
             }
 
             .btn-start {
-                margin-top: 25px;
+                margin-top: 30px;
                 background: transparent;
                 border: 1px solid #38bdf8;
                 color: #38bdf8;
@@ -166,29 +107,14 @@ def inicio():
     </head>
     <body>
 
-        <div id="hudPanels" class="hud-grid">
-            <div class="hud-card">
-                <div class="hud-label">SISTEMA / HORA</div>
-                <div id="valHora" class="hud-value">--:--:--</div>
-            </div>
-            <div class="hud-card">
-                <div class="hud-label">USD / HNL</div>
-                <div id="valDolar" class="hud-value">L. 25.40</div>
-            </div>
-            <div class="hud-card">
-                <div class="hud-label">ESTADO CLIMA</div>
-                <div id="valClima" class="hud-value">28°C HND</div>
-            </div>
-        </div>
-
         <div class="jarvis-widget">
             <div class="reactor-ring ring-1"></div>
             <div class="reactor-ring ring-2"></div>
-            <div id="orb" class="orb off"></div>
+            <div id="orb" class="orb"></div>
         </div>
 
         <div id="statusText" class="status-display">SISTEMA EN ESPERA</div>
-        <div id="responseText" class="response-text">Inicialice el enlace neuronal.</div>
+        <div id="responseText" class="response-text">Inicialice el sistema.</div>
 
         <button id="btnPower" class="btn-start" onclick="iniciarJARVIS()">INICIAR JARVIS</button>
 
@@ -196,13 +122,6 @@ def inicio():
             let reconocedorVoz;
             let estaHablando = false;
             let sistemaActivo = false;
-
-            function actualizarReloj() {
-                const ahora = new Date();
-                document.getElementById('valHora').innerText = ahora.toLocaleTimeString();
-            }
-            setInterval(actualizarReloj, 1000);
-            actualizarReloj();
 
             function hablar(texto) {
                 if ('speechSynthesis' in window) {
@@ -245,11 +164,7 @@ def inicio():
                         body: JSON.stringify({ texto: texto })
                     });
                     const data = await res.json();
-
-                    // Despliegue animado suave de las pantallas
-                    document.getElementById('hudPanels').classList.add('desplegar');
                     document.getElementById('responseText').innerText = data.respuesta;
-                    
                     hablar(data.respuesta);
                 } catch (e) {
                     document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
@@ -259,7 +174,7 @@ def inicio():
             function iniciarJARVIS() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    alert("Se requiere Google Chrome para el soporte de voz.");
+                    alert("Usa Google Chrome para el reconocimiento de voz.");
                     return;
                 }
 
@@ -310,352 +225,23 @@ class EntradaTexto(BaseModel):
 
 @app.post("/procesar")
 async def procesar(data: EntradaTexto):
-    if not GEMINI_KEY:
-        print("ERROR: La variable GEMINI_KEY está vacía.")
-        return {"respuesta": "Señor, no detecto la clave de API configurada en el sistema."}
+    if not client_gemini or API_KEY == "TU_API_KEY_AQUI":
+        return {"respuesta": "Señor, debe colocar su API Key válida directamente en la variable API_KEY del archivo main.py."}
 
     prompt = (
-        "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
-        "Responde a la duda o petición del usuario en español con elegancia y concisión. "
-        "Al finalizar tu respuesta, concluye SIEMPRE de forma fluida agregando la frase: "
-        "'Aquí le doy información que le puede interesar señor, si gusta otra información puedo dársela.' "
+        "Eres JARVIS, la Inteligencia Artificial de Tony Stark. "
+        "Responde brevemente y en español con elegancia. "
+        "Concluye diciendo: 'Aquí le doy información que le puede interesar señor, si gusta otra información puedo dársela.' "
         f"El usuario dice: {data.texto}"
     )
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        res = model.generate_content(prompt)
+        # Petición oficial con la versión de modelo directa
+        res = client_gemini.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
         return {"respuesta": res.text}
     except Exception as e:
-        print(f"Error en la API: {e}")
-        return {"respuesta": f"Señor, ocurrió un inconveniente con el enlace neuronal: {str(e)}"}from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-import google.generativeai as genai
-import os
-
-app = FastAPI()
-
-GEMINI_KEY = os.getenv("GEMINI_KEY")
-if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
-
-@app.get("/", response_class=HTMLResponse)
-def inicio():
-    return """
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>J.A.R.V.I.S. HUD</title>
-        <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { 
-                background: #020617; 
-                color: #38bdf8; 
-                font-family: 'Segoe UI', monospace; 
-                display: flex; 
-                flex-direction: column; 
-                align-items: center; 
-                justify-content: center; 
-                min-height: 100vh; 
-                overflow-x: hidden;
-                padding: 20px;
-            }
-
-            /* Contenedor principal de pantallas */
-            .hud-grid {
-                display: flex;
-                gap: 15px;
-                margin-bottom: 25px;
-                flex-wrap: wrap;
-                justify-content: center;
-                width: 100%;
-                max-width: 800px;
-                max-height: 0;
-                opacity: 0;
-                overflow: hidden;
-                transition: max-height 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease-in-out;
-            }
-
-            /* Estado cuando JARVIS activa el despliegue */
-            .hud-grid.desplegar {
-                max-height: 200px;
-                opacity: 1;
-            }
-
-            /* Tarjetas individuales con efecto de apertura y rotación 3D */
-            .hud-card {
-                background: rgba(15, 23, 42, 0.85);
-                border: 1px solid rgba(56, 189, 248, 0.4);
-                border-radius: 12px;
-                padding: 15px 25px;
-                text-align: center;
-                min-width: 180px;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
-                transform: scaleY(0) translateY(-20px) rotateX(-90deg);
-                opacity: 0;
-                transform-origin: top center;
-                transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
-            }
-
-            /* Despliegue en cascada de cada panel */
-            .hud-grid.desplegar .hud-card {
-                transform: scaleY(1) translateY(0) rotateX(0deg);
-                opacity: 1;
-            }
-
-            .hud-grid.desplegar .hud-card:nth-child(1) { transition-delay: 0.1s; }
-            .hud-grid.desplegar .hud-card:nth-child(2) { transition-delay: 0.25s; }
-            .hud-grid.desplegar .hud-card:nth-child(3) { transition-delay: 0.4s; }
-
-            .hud-label {
-                font-size: 0.75rem;
-                color: #94a3b8;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-            }
-            .hud-value {
-                font-size: 1.3rem;
-                font-weight: bold;
-                color: #38bdf8;
-                margin-top: 6px;
-                text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
-            }
-
-            .jarvis-widget {
-                position: relative;
-                width: 240px;
-                height: 240px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .reactor-ring {
-                position: absolute;
-                border-radius: 50%;
-                border: 2px dashed rgba(56, 189, 248, 0.3);
-            }
-            .ring-1 { width: 230px; height: 230px; animation: spin 20s linear infinite; }
-            .ring-2 { width: 180px; height: 180px; border: 2px solid rgba(56, 189, 248, 0.5); border-top-color: transparent; animation: spinRev 10s linear infinite; }
-
-            .orb {
-                width: 110px;
-                height: 110px;
-                border-radius: 50%;
-                background: radial-gradient(circle, #38bdf8 0%, #0284c7 60%, #0f172a 100%);
-                box-shadow: 0 0 50px rgba(56, 189, 248, 0.4);
-                animation: float 3.5s ease-in-out infinite;
-                transition: all 0.4s ease;
-                z-index: 5;
-            }
-            .orb.off { background: radial-gradient(circle, #334155 0%, #0f172a 100%); box-shadow: none; }
-            .orb.speaking { animation: float 1.5s ease-in-out infinite, pulse 0.3s ease-in-out infinite alternate; box-shadow: 0 0 80px #38bdf8; }
-            .orb.listening { background: radial-gradient(circle, #f43f5e 0%, #be123c 100%); box-shadow: 0 0 60px #f43f5e; }
-
-            @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-            @keyframes pulse { 0% { transform: scale(0.95); } 100% { transform: scale(1.1); } }
-            @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            @keyframes spinRev { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
-
-            .status-display {
-                margin-top: 20px;
-                font-size: 0.8rem;
-                letter-spacing: 2px;
-                color: #94a3b8;
-                text-align: center;
-            }
-
-            .response-text {
-                margin-top: 15px;
-                max-width: 550px;
-                text-align: center;
-                font-size: 1rem;
-                color: #e0f2fe;
-                min-height: 45px;
-                line-height: 1.4;
-            }
-
-            .btn-start {
-                margin-top: 25px;
-                background: transparent;
-                border: 1px solid #38bdf8;
-                color: #38bdf8;
-                padding: 12px 30px;
-                border-radius: 20px;
-                cursor: pointer;
-                letter-spacing: 2px;
-                transition: 0.3s;
-                font-family: inherit;
-            }
-            .btn-start:hover { background: #38bdf8; color: #020617; box-shadow: 0 0 15px #38bdf8; }
-        </style>
-    </head>
-    <body>
-
-        <div id="hudPanels" class="hud-grid">
-            <div class="hud-card">
-                <div class="hud-label">SISTEMA / HORA</div>
-                <div id="valHora" class="hud-value">--:--:--</div>
-            </div>
-            <div class="hud-card">
-                <div class="hud-label">USD / HNL</div>
-                <div id="valDolar" class="hud-value">L. 25.40</div>
-            </div>
-            <div class="hud-card">
-                <div class="hud-label">ESTADO CLIMA</div>
-                <div id="valClima" class="hud-value">28°C HND</div>
-            </div>
-        </div>
-
-        <div class="jarvis-widget">
-            <div class="reactor-ring ring-1"></div>
-            <div class="reactor-ring ring-2"></div>
-            <div id="orb" class="orb off"></div>
-        </div>
-
-        <div id="statusText" class="status-display">SISTEMA EN ESPERA</div>
-        <div id="responseText" class="response-text">Inicialice el enlace neuronal.</div>
-
-        <button id="btnPower" class="btn-start" onclick="iniciarJARVIS()">INICIAR JARVIS</button>
-
-        <script>
-            let reconocedorVoz;
-            let estaHablando = false;
-            let sistemaActivo = false;
-
-            function actualizarReloj() {
-                const ahora = new Date();
-                document.getElementById('valHora').innerText = ahora.toLocaleTimeString();
-            }
-            setInterval(actualizarReloj, 1000);
-            actualizarReloj();
-
-            function hablar(texto) {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    const utt = new SpeechSynthesisUtterance(texto);
-                    utt.lang = 'es-ES';
-                    utt.rate = 1.0;
-                    utt.pitch = 0.8;
-
-                    utt.onstart = () => {
-                        estaHablando = true;
-                        document.getElementById('orb').className = "orb speaking";
-                    };
-
-                    utt.onend = () => {
-                        estaHablando = false;
-                        document.getElementById('orb').className = "orb";
-                        document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
-                        
-                        if (sistemaActivo) {
-                            try { reconocedorVoz.start(); } catch(e){}
-                        }
-                    };
-
-                    window.speechSynthesis.speak(utt);
-                }
-            }
-
-            async function procesarComando(texto) {
-                if (!texto || estaHablando) return;
-
-                document.getElementById('responseText').innerText = '"' + texto + '"';
-                document.getElementById('orb').className = "orb listening";
-                document.getElementById('statusText').innerText = "PROCESANDO...";
-
-                try {
-                    const res = await fetch("/procesar", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ texto: texto })
-                    });
-                    const data = await res.json();
-
-                    // Despliegue animado suave de las pantallas
-                    document.getElementById('hudPanels').classList.add('desplegar');
-                    document.getElementById('responseText').innerText = data.respuesta;
-                    
-                    hablar(data.respuesta);
-                } catch (e) {
-                    document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
-                }
-            }
-
-            function iniciarJARVIS() {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    alert("Se requiere Google Chrome para el soporte de voz.");
-                    return;
-                }
-
-                sistemaActivo = true;
-                document.getElementById('btnPower').style.display = 'none';
-                document.getElementById('orb').className = "orb";
-                document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
-                document.getElementById('responseText').innerText = "Sistemas listos, señor.";
-
-                reconocedorVoz = new SpeechRecognition();
-                reconocedorVoz.lang = 'es-ES';
-                reconocedorVoz.continuous = false;
-                reconocedorVoz.interimResults = false;
-
-                reconocedorVoz.onstart = () => {
-                    if (!estaHablando) {
-                        document.getElementById('orb').className = "orb listening";
-                        document.getElementById('statusText').innerText = "ESCUCHANDO...";
-                    }
-                };
-
-                reconocedorVoz.onresult = (event) => {
-                    const comando = event.results[0][0].transcript;
-                    procesarComando(comando);
-                };
-
-                reconocedorVoz.onerror = (event) => {
-                    if (sistemaActivo && !estaHablando) {
-                        setTimeout(() => { try { reconocedorVoz.start(); } catch(e){} }, 500);
-                    }
-                };
-
-                reconocedorVoz.onend = () => {
-                    if (sistemaActivo && !estaHablando) {
-                        try { reconocedorVoz.start(); } catch(e){}
-                    }
-                };
-
-                hablar("A su servicio, señor. Le escucho.");
-            }
-        </script>
-    </body>
-    </html>
-    """
-
-class EntradaTexto(BaseModel):
-    texto: str
-
-@app.post("/procesar")
-async def procesar(data: EntradaTexto):
-    if not GEMINI_KEY:
-        print("ERROR: La variable GEMINI_KEY está vacía.")
-        return {"respuesta": "Señor, no detecto la clave de API configurada en el sistema."}
-
-    prompt = (
-        "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
-        "Responde a la duda o petición del usuario en español con elegancia y concisión. "
-        "Al finalizar tu respuesta, concluye SIEMPRE de forma fluida agregando la frase: "
-        "'Aquí le doy información que le puede interesar señor, si gusta otra información puedo dársela.' "
-        f"El usuario dice: {data.texto}"
-    )
-
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        res = model.generate_content(prompt)
-        return {"respuesta": res.text}
-    except Exception as e:
-        print(f"Error en la API: {e}")
-        return {"respuesta": f"Señor, ocurrió un inconveniente con el enlace neuronal: {str(e)}"}
+        print(f"Error interno: {e}")
+        return {"respuesta": f"Señor, la API devolvió este error exacto: {str(e)}"}
