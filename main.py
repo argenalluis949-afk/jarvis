@@ -225,22 +225,22 @@ class EntradaTexto(BaseModel):
 
 @app.post("/procesar")
 async def procesar(data: EntradaTexto):
-    if not client_gemini or API_KEY == "TU_API_KEY_AQUI":
+    if not client_gemini or API_KEY == "AQ.Ab8RN6ITAg5KbyR8C_hPa2XIQ106q_qqe72ro43GADTXm0MQng":
         return {"respuesta": "Señor, debe colocar su API Key válida directamente en la variable API_KEY del archivo main.py."}
 
     prompt = (
-        "Eres JARVIS, la Inteligencia Artificial de Tony Stark. "
+        "Eres JARVIS, la Inteligencia Artificial de el señor luis. "
         "Responde brevemente y en español con elegancia. "
         "Concluye diciendo: 'Aquí le doy información que le puede interesar señor, si gusta otra información puedo dársela.' "
         f"El usuario dice: {data.texto}"
     )
 
     try:
-        # Petición oficial con la versión de modelo directa
-        res = client_gemini.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
+        # CÓDIGO CORREGIDO:
+res = client_gemini.models.generate_content(
+    model="gemini-3.6-flash",
+    contents=prompt
+)
         return {"respuesta": res.text}
     except Exception as e:
         print(f"Error interno: {e}")
