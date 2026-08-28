@@ -1,11 +1,12 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from google import genai
 
 app = FastAPI()
 
+# Inicialización del cliente con la API Key desde variables de entorno
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 client_gemini = genai.Client(api_key=GEMINI_KEY) if GEMINI_KEY else None
 
@@ -302,7 +303,7 @@ def inicio():
                         hablar(data.respuesta);
                     } catch (e) {
                         document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
-                        hablar("He experimentado una falla de comunicación con los servidores.");
+                        hablar("He detectado una falla de enlace con los servidores.");
                     }
                 };
 
@@ -314,7 +315,7 @@ def inicio():
 
                 reconocedorVoz.onerror = (e) => {
                     if (e.error !== 'no-speech') {
-                        console.warn("Error reconocedor:", e.error);
+                        console.warn("Error del reconocedor:", e.error);
                     }
                 };
 
@@ -328,18 +329,22 @@ def inicio():
 @app.post("/procesar")
 async def procesar(data: EntradaTexto):
     if not client_gemini:
-        return {"respuesta": "Clave API de Gemini no configurada en el servidor."}
+        return {"respuesta": "Clave API no configurada en las variables de entorno."}
 
     try:
         prompt = (
-            "Eres J.A.R.V.I.S., la inteligencia artificial de Tony Stark. "
+            "Eres JARVIS, la Inteligencia Artificial sofisticada de Tony Stark. "
             "Responde de forma muy concisa (máximo 2 oraciones), extremadamente elegante, educada, sobria y profesional, en español. "
             f"El usuario dice: {data.texto}"
         )
+        # Usamos gemini-2.5-flash para contar con una cuota gratuita más holgada
         res = client_gemini.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )
         return {"respuesta": res.text}
     except Exception as e:
-        return {"respuesta": f"Fallo en los circuitos principales: {str(e)}"}
+        error_str = str(e)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            return {"respuesta": "Señor, hemos alcanzado el límite de procesamiento gratuito del núcleo. Por favor, aguarde unos momentos."}
+        return {"respuesta": "He detectado una anomalía en los circuitos principales."}
