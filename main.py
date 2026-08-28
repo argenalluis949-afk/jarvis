@@ -132,8 +132,17 @@ def inicio():
                 line-height: 1.4;
             }
 
-            .btn-start {
+            .controls-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
                 margin-top: 20px;
+                width: 100%;
+                max-width: 450px;
+            }
+
+            .btn-action {
                 background: transparent;
                 border: 1px solid #38bdf8;
                 color: #38bdf8;
@@ -142,8 +151,27 @@ def inicio():
                 cursor: pointer;
                 letter-spacing: 1px;
                 transition: 0.3s;
+                font-family: inherit;
             }
-            .btn-start:hover { background: #38bdf8; color: #020617; box-shadow: 0 0 15px #38bdf8; }
+            .btn-action:hover { background: #38bdf8; color: #020617; box-shadow: 0 0 15px #38bdf8; }
+
+            .input-box {
+                display: flex;
+                gap: 8px;
+                width: 100%;
+            }
+
+            .text-input {
+                flex: 1;
+                background: rgba(15, 23, 42, 0.8);
+                border: 1px solid rgba(56, 189, 248, 0.4);
+                border-radius: 20px;
+                padding: 10px 16px;
+                color: #e0f2fe;
+                font-family: inherit;
+                outline: none;
+            }
+            .text-input:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
         </style>
     </head>
     <body>
@@ -166,21 +194,23 @@ def inicio():
         <div class="jarvis-widget">
             <div class="reactor-ring ring-1"></div>
             <div class="reactor-ring ring-2"></div>
-            <div id="orb" class="orb off"></div>
+            <div id="orb" class="orb"></div>
         </div>
 
-        <div id="statusText" class="status-display">SISTEMA OFFLINE</div>
-        <div id="responseText" class="response-text">Presione para calibrar alta sensibilidad.</div>
+        <div id="statusText" class="status-display">SISTEMA LISTO</div>
+        <div id="responseText" class="response-text">Presione "Hablar con JARVIS" o escriba su comando.</div>
 
-        <button id="btnPower" class="btn-start" onclick="iniciarSistema()">CONECTAR SISTEMA</button>
+        <div class="controls-container">
+            <button id="btnMic" class="btn-action" onclick="activarMicrofono()">HABLAR CON JARVIS</button>
+            <div class="input-box">
+                <input type="text" id="txtPrompt" class="text-input" placeholder="Escribe tu mensaje..." onkeypress="detectarEnter(event)">
+                <button class="btn-action" onclick="enviarTexto()">ENVIAR</button>
+            </div>
+        </div>
 
         <script>
-            let audioCtx, analyser, micStream, gainNode;
-            let sistemaConectado = false;
-            let jarvisEncendido = false;
             let reconocedorVoz;
             let estaHablando = false;
-            let ultimoPico = 0;
 
             function actualizarReloj() {
                 const ahora = new Date();
@@ -188,88 +218,6 @@ def inicio():
             }
             setInterval(actualizarReloj, 1000);
             actualizarReloj();
-
-            async function iniciarSistema() {
-                if (sistemaConectado) return;
-
-                try {
-                    // Solicita entrada directa sin filtros de supresión agresivos para captar tonos bajos
-                    micStream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: {
-                            echoCancellation: true,
-                            noiseSuppression: false,
-                            autoGainControl: true
-                        } 
-                    });
-
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    if (audioCtx.state === 'suspended') {
-                        await audioCtx.resume();
-                    }
-
-                    // Pre-amplificador para aumentar volumen de voces bajas
-                    gainNode = audioCtx.createGain();
-                    gainNode.gain.value = 2.5; // Amplificación al 250%
-
-                    analyser = audioCtx.createAnalyser();
-                    const source = audioCtx.createMediaStreamSource(micStream);
-                    
-                    source.connect(gainNode);
-                    gainNode.connect(analyser);
-                    analyser.fftSize = 256;
-
-                    sistemaConectado = true;
-                    document.getElementById('btnPower').style.display = 'none';
-                    document.getElementById('statusText').innerText = "SENSORES DE ALTA SENSIBILIDAD ACTIVOS";
-                    document.getElementById('responseText').innerText = "Puedes hablar suavemente o aplaudir...";
-
-                    iniciarSensorAplausos();
-                    iniciarReconocimientoVoz();
-                } catch (err) {
-                    alert("Asegúrate de conceder permisos de micrófono en Google Chrome.");
-                }
-            }
-
-            function iniciarSensorAplausos() {
-                const bufferLength = analyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
-
-                function medir() {
-                    if (sistemaConectado && !jarvisEncendido && !estaHablando) {
-                        analyser.getByteFrequencyData(dataArray);
-                        let suma = 0;
-                        for (let i = 0; i < bufferLength; i++) suma += dataArray[i];
-                        let promedio = suma / bufferLength;
-
-                        // Umbral ajustado por amplificación previa
-                        if (promedio > 110) {
-                            let ahora = Date.now();
-                            if (ahora - ultimoPico < 600 && ahora - ultimoPico > 150) {
-                                encenderJarvis();
-                            }
-                            ultimoPico = ahora;
-                        }
-                    }
-                    requestAnimationFrame(medir);
-                }
-                medir();
-            }
-
-            function encenderJarvis() {
-                if (jarvisEncendido) return;
-                jarvisEncendido = true;
-                document.getElementById('orb').className = "orb";
-                document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO AUDIOS BAJOS";
-                hablar("Sistemas a su disposición, señor. Le escucho.");
-            }
-
-            function apagarJarvis() {
-                jarvisEncendido = false;
-                document.getElementById('orb').className = "orb off";
-                document.getElementById('statusText').innerText = "MODO ESPERA | DI 'HOLA JARVIS' O APLAUDE";
-                document.getElementById('responseText').innerText = "Sistemas en reposo.";
-                document.getElementById('hudPanels').classList.remove('desplegar');
-            }
 
             function hablar(texto) {
                 if ('speechSynthesis' in window) {
@@ -286,94 +234,91 @@ def inicio():
 
                     utt.onend = () => {
                         estaHablando = false;
-                        if (jarvisEncendido) {
-                            document.getElementById('orb').className = "orb";
-                            document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
-                        } else {
-                            apagarJarvis();
-                        }
+                        document.getElementById('orb').className = "orb";
+                        document.getElementById('statusText').innerText = "JARVIS ONLINE | EN ESPERA";
                     };
 
                     window.speechSynthesis.speak(utt);
                 }
             }
 
-            function iniciarReconocimientoVoz() {
+            async function procesarComando(texto) {
+                if (!texto || estaHablando) return;
+
+                document.getElementById('responseText').innerText = '"' + texto + '"';
+                document.getElementById('orb').className = "orb listening";
+                document.getElementById('statusText').innerText = "PROCESANDO...";
+
+                try {
+                    const res = await fetch("/procesar", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ texto: texto })
+                    });
+                    const data = await res.json();
+
+                    document.getElementById('hudPanels').classList.add('desplegar');
+                    document.getElementById('responseText').innerText = data.respuesta;
+                    
+                    hablar(data.respuesta);
+                } catch (e) {
+                    document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
+                }
+            }
+
+            function activarMicrofono() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Navegador no compatible. Debe usar Google Chrome.";
+                    alert("Utilice Google Chrome para el soporte de voz.");
                     return;
                 }
 
+                if (reconocedorVoz) {
+                    try { reconocedorVoz.stop(); } catch(e){}
+                }
+
                 reconocedorVoz = new SpeechRecognition();
-                reconocedorVoz.continuous = true;
                 reconocedorVoz.lang = 'es-ES';
-                reconocedorVoz.interimResults = true; // Captura palabras intermedias aun si hablas despacio
+                reconocedorVoz.interimResults = false;
 
-                reconocedorVoz.onresult = async (event) => {
-                    if (estaHablando) return;
-
-                    let textoEscuchado = "";
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        textoEscuchado += event.results[i][0].transcript;
-                    }
-
-                    const comando = textoEscuchado.trim().toLowerCase();
-                    if (!comando) return;
-
-                    // Muestra en tiempo real lo que está escuchando en pantalla
-                    document.getElementById('responseText').innerText = '"' + comando + '"';
-
-                    if (!jarvisEncendido) {
-                        if (comando.includes("hola jarvis") || comando.includes("jarvis") || comando.includes("despierta") || comando.includes("actívate") || comando.includes("activate") || comando.includes("hola")) {
-                            encenderJarvis();
-                        }
-                        return;
-                    }
-
-                    // Solo procesa llamadas finales completas al servidor
-                    if (event.results[event.results.length - 1].isFinal) {
-                        if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
-                            hablar("Desactivando interfaz. Hasta luego, señor.");
-                            jarvisEncendido = false;
-                            document.getElementById('hudPanels').classList.remove('desplegar');
-                            return;
-                        }
-
-                        document.getElementById('orb').className = "orb listening";
-                        document.getElementById('statusText').innerText = "PROCESANDO...";
-
-                        try {
-                            const res = await fetch("/procesar", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ texto: comando })
-                            });
-                            const data = await res.json();
-                            
-                            document.getElementById('hudPanels').classList.add('desplegar');
-                            document.getElementById('responseText').innerText = data.respuesta;
-                            
-                            hablar(data.respuesta);
-                        } catch (e) {
-                            document.getElementById('statusText').innerText = "ERROR DE CONEXIÓN";
-                        }
-                    }
+                reconocedorVoz.onstart = () => {
+                    document.getElementById('orb').className = "orb listening";
+                    document.getElementById('statusText').innerText = "ESCUCHANDO...";
                 };
 
-                reconocedorVoz.onerror = () => {
-                    if (sistemaConectado && !estaHablando) {
-                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 300);
-                    }
+                reconocedorVoz.onresult = (event) => {
+                    const comando = event.results[0][0].transcript;
+                    procesarComando(comando);
+                };
+
+                reconocedorVoz.onerror = (event) => {
+                    document.getElementById('orb').className = "orb";
+                    document.getElementById('statusText').innerText = "ERROR (" + event.error + ")";
                 };
 
                 reconocedorVoz.onend = () => {
-                    if (sistemaConectado && !estaHablando) {
-                        setTimeout(() => { try { reconocedorVoz.start(); } catch(err){} }, 300);
+                    if (!estaHablando) {
+                        document.getElementById('orb').className = "orb";
+                        document.getElementById('statusText').innerText = "SISTEMA LISTO";
                     }
                 };
 
-                try { reconocedorVoz.start(); } catch(e){}
+                reconocedorVoz.start();
+            }
+
+            function enviarTexto() {
+                const input = document.getElementById('txtPrompt');
+                const texto = input.value.trim();
+                if (texto) {
+                    procesarComando(texto);
+                    input.value = '';
+                }
+            }
+
+            function detectarEnter(e) {
+                if (e.key === 'Enter') {
+                    enviarTexto();
+                }
             }
         </script>
     </body>
