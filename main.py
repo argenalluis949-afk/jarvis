@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 from google import genai
 from groq import Groq
 import os
-import io
 
 app = FastAPI()
 
@@ -20,29 +19,72 @@ def inicio():
     <html lang="es">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>JARVIS SYSTEM</title>
         <style>
-            body { background-color: #0b0f19; color: white; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .card { background: #1e293b; padding: 40px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+            body { 
+                background-color: #0b0f19; 
+                color: white; 
+                font-family: Arial, sans-serif; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                height: 100vh; 
+                margin: 0; 
+            }
+            .card { 
+                background: #1e293b; 
+                padding: 40px; 
+                border-radius: 16px; 
+                text-align: center; 
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
+                max-width: 400px;
+                width: 90%;
+            }
             h1 { color: #38bdf8; margin-bottom: 25px; }
-            button { background: #0284c7; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 50px; cursor: pointer; }
+            button { 
+                background: #0284c7; 
+                color: white; 
+                border: none; 
+                padding: 15px 30px; 
+                font-size: 18px; 
+                font-weight: bold; 
+                border-radius: 50px; 
+                cursor: pointer; 
+                transition: background 0.2s;
+            }
             button:hover { background: #0369a1; }
             #status { margin-top: 20px; color: #94a3b8; }
-            #res { margin-top: 20px; font-size: 20px; color: #4ade80; font-weight: bold; }
+            #res { margin-top: 20px; font-size: 18px; color: #4ade80; font-weight: bold; }
         </style>
     </head>
     <body>
         <div class="card">
             <h1>JARVIS SYSTEM</h1>
-            <button onclick="startRecording()">🎤 Presiona para Hablar</button>
+            <button id="micBtn" onclick="startRecording()">🎤 Presiona para Hablar</button>
             <div id="status">SISTEMA ONLINE</div>
             <div id="res"></div>
         </div>
 
         <script>
+            function hablar(texto) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Detener cualquier audio previo
+                    const utterance = new SpeechSynthesisUtterance(texto);
+                    utterance.lang = 'es-ES'; // Idioma español
+                    utterance.rate = 1.0;     // Velocidad normal
+                    utterance.pitch = 0.9;    // Tono ligeramente más grave para JARVIS
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+
             async function startRecording() {
                 const status = document.getElementById('status');
                 const resDiv = document.getElementById('res');
+                const btn = document.getElementById('micBtn');
+
+                btn.disabled = true;
                 status.innerText = "Escuchando (4 segundos)...";
                 resDiv.innerText = "";
 
@@ -61,10 +103,16 @@ def inicio():
                         try {
                             const response = await fetch("/jarvis", { method: "POST", body: formData });
                             const data = await response.json();
+                            
                             status.innerText = "Tú: " + data.escuchado;
                             resDiv.innerText = "JARVIS: " + data.respuesta_jarvis;
+                            
+                            // JARVIS responde con voz
+                            hablar(data.respuesta_jarvis);
                         } catch (e) {
                             status.innerText = "Error procesando el audio";
+                        } finally {
+                            btn.disabled = false;
                         }
                     };
 
@@ -72,6 +120,7 @@ def inicio():
                     setTimeout(() => mediaRecorder.stop(), 4000);
                 } catch (e) {
                     status.innerText = "Error: Acceso al micrófono denegado";
+                    btn.disabled = false;
                 }
             }
         </script>
@@ -85,19 +134,21 @@ async def procesar_audio(file: UploadFile = File(...)):
         return {"escuchado": "Error", "respuesta_jarvis": "Faltan las claves API en Vercel."}
 
     try:
-        # Lectura directa en memoria (sin crear archivos en el disco)
         audio_bytes = await file.read()
         audio_file_tuple = ("voice.wav", audio_bytes)
 
-        # Transcripción directa con Groq
+        # Transcripción con Groq Whisper
         transcripcion = client_groq.audio.transcriptions.create(
             file=audio_file_tuple,
             model="whisper-large-v3-turbo",
             response_format="text"
         )
 
-        # Respuesta con Gemini
-        prompt = f"Eres JARVIS, un asistente inteligente y conciso. Responde en español a esto: {transcripcion}"
+        # Generación de respuesta con Gemini
+        prompt = (
+            "Eres JARVIS, un asistente inteligente, directo y conciso. "
+            f"Responde de forma breve y clara en español a lo siguiente: {transcripcion}"
+        )
         respuesta_gemini = client_gemini.models.generate_content(
             model="gemini-3.6-flash",
             contents=prompt
@@ -110,5 +161,5 @@ async def procesar_audio(file: UploadFile = File(...)):
     except Exception as e:
         return {
             "escuchado": "Error en el servidor",
-            "respuesta_jarvis": f"Detalle: {str(e)}"
+            "respuesta_jarvis": f"Detalle del error: {str(e)}"
         }
