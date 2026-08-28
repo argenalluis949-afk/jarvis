@@ -32,7 +32,6 @@ def inicio():
                 overflow: hidden;
             }
 
-            /* Widget Flotante Estilo Holograma */
             .jarvis-widget {
                 position: relative;
                 width: 300px;
@@ -52,7 +51,6 @@ def inicio():
             .ring-1 { width: 280px; height: 280px; animation: spin 20s linear infinite; }
             .ring-2 { width: 220px; height: 220px; border: 2px solid rgba(56, 189, 248, 0.5); border-top-color: transparent; animation: spinRev 10s linear infinite; }
 
-            /* Esfera Central Flotante */
             .orb {
                 width: 130px;
                 height: 130px;
@@ -64,7 +62,6 @@ def inicio():
                 z-index: 5;
             }
 
-            /* Estados del Orbe */
             .orb.off {
                 background: radial-gradient(circle, #334155 0%, #0f172a 100%);
                 box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
@@ -136,7 +133,7 @@ def inicio():
         </div>
 
         <div id="statusText" class="status-display">SISTEMA OFFLINE</div>
-        <div id="responseText" class="response-text">Presiona "Conectar" para calibrar sensores.</div>
+        <div id="responseText" class="response-text">Presiona "Conectar" para iniciar.</div>
 
         <button id="btnPower" class="btn-start" onclick="iniciarSistema()">CONECTAR SISTEMA</button>
 
@@ -146,6 +143,7 @@ def inicio():
             let jarvisEncendido = false;
             let reconocedorVoz;
             let estaHablando = false;
+            let ultimoPico = 0;
 
             async function iniciarSistema() {
                 if (sistemaConectado) return;
@@ -161,36 +159,31 @@ def inicio():
 
                     sistemaConectado = true;
                     document.getElementById('btnPower').style.display = 'none';
-                    document.getElementById('statusText').innerText = "SENSORES ACTIVOS | APLAUDE PARA ENCENDER";
-                    document.getElementById('responseText').innerText = "Esperando señal de impacto (aplauso)...";
+                    document.getElementById('statusText').innerText = "EN ESPERA | DI 'HOLA JARVIS' O APLAUDE";
+                    document.getElementById('responseText').innerText = "Escuchando voz y aplausos...";
 
-                    calibrarDeteccionAplausos();
-                    prepararReconocimientoVoz();
+                    iniciarSensorAplausos();
+                    iniciarReconocimientoVoz();
                 } catch (err) {
-                    alert("Se requiere acceso al micrófono para operar el sistema.");
+                    alert("Se requiere permiso de micrófono para funcionar.");
                 }
             }
 
-            // Detección de aplauso por picos drásticos de sonido (transitorios)
-            function calibrarDeteccionAplausos() {
+            // Detección opcional por aplausos
+            function iniciarSensorAplausos() {
                 const bufferLength = analyser.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
-                let ultimoPico = 0;
 
                 function medir() {
                     if (sistemaConectado && !jarvisEncendido && !estaHablando) {
                         analyser.getByteFrequencyData(dataArray);
-                        
                         let suma = 0;
-                        for (let i = 0; i < bufferLength; i++) {
-                            suma += dataArray[i];
-                        }
+                        for (let i = 0; i < bufferLength; i++) suma += dataArray[i];
                         let promedio = suma / bufferLength;
 
-                        // Se requiere un pico de volumen alto repentino (> 85)
                         if (promedio > 85) {
                             let ahora = Date.now();
-                            if (ahora - ultimoPico < 600 && ahora - ultimoAplauso > 200) {
+                            if (ahora - ultimoPico < 600 && ahora - ultimoPico > 150) {
                                 encenderJarvis();
                             }
                             ultimoPico = ahora;
@@ -202,22 +195,18 @@ def inicio():
             }
 
             function encenderJarvis() {
+                if (jarvisEncendido) return;
                 jarvisEncendido = true;
                 document.getElementById('orb').className = "orb";
-                document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
-                hablar("A su servicio, señor. Sistemas listos.");
-                
-                if (reconocedorVoz) {
-                    try { reconocedorVoz.start(); } catch(e){}
-                }
+                document.getElementById('statusText').innerText = "JARVIS ONLINE | TE ESCUCHO";
+                hablar("A su servicio, señor. ¿Qué necesita?");
             }
 
             function apagarJarvis() {
                 jarvisEncendido = false;
-                if (reconocedorVoz) reconocedorVoz.stop();
                 document.getElementById('orb').className = "orb off";
-                document.getElementById('statusText').innerText = "MODO ESPERA | APLAUDE PARA REACTIVAR";
-                document.getElementById('responseText').innerText = "Sistemas en pausa.";
+                document.getElementById('statusText').innerText = "MODO ESPERA | DI 'HOLA JARVIS' O APLAUDE";
+                document.getElementById('responseText').innerText = "Sistemas en reposo.";
             }
 
             function hablar(texto) {
@@ -237,6 +226,7 @@ def inicio():
                         estaHablando = false;
                         if (jarvisEncendido) {
                             document.getElementById('orb').className = "orb";
+                            document.getElementById('statusText').innerText = "JARVIS ONLINE | ESCUCHANDO";
                         } else {
                             apagarJarvis();
                         }
@@ -246,10 +236,10 @@ def inicio():
                 }
             }
 
-            function prepararReconocimientoVoz() {
+            function iniciarReconocimientoVoz() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    document.getElementById('responseText').innerText = "Navegador no compatible con Web Speech. Usa Google Chrome.";
+                    document.getElementById('responseText').innerText = "Tu navegador no soporta reconocimiento continuo. Usa Google Chrome.";
                     return;
                 }
 
@@ -259,23 +249,32 @@ def inicio():
                 reconocedorVoz.interimResults = false;
 
                 reconocedorVoz.onresult = async (event) => {
-                    if (!jarvisEncendido || estaHablando) return;
+                    if (estaHablando) return;
 
                     const index = event.results.length - 1;
                     const comando = event.results[index][0].transcript.trim().toLowerCase();
 
-                    document.getElementById('responseText').innerText = '"' + comando + '"';
+                    console.log("Escuchado:", comando);
 
-                    // Comando de apagado
+                    // 1. SI ESTÁ APAGADO: Buscar comandos de activación por voz
+                    if (!jarvisEncendido) {
+                        if (comando.includes("hola jarvis") || comando.includes("jarvis") || comando.includes("despierta") || comando.includes("actívate") || comando.includes("activate")) {
+                            encenderJarvis();
+                        }
+                        return;
+                    }
+
+                    // 2. SI ESTÁ ENCENDIDO: Buscar comandos de apagado
                     if (comando.includes("apágate") || comando.includes("apagate") || comando.includes("descansa") || comando.includes("desactívate")) {
-                        hablar("Desactivando interfaz. Hasta luego, señor.");
+                        hablar("Desactivando sistemas. Hasta luego, señor.");
                         jarvisEncendido = false;
                         return;
                     }
 
-                    // Enviar comando a backend
+                    // 3. SI ESTÁ ENCENDIDO: Procesar pregunta normal con Gemini
+                    document.getElementById('responseText').innerText = '"' + comando + '"';
                     document.getElementById('orb').className = "orb listening";
-                    document.getElementById('statusText').innerText = "PROCESANDO... ";
+                    document.getElementById('statusText').innerText = "PROCESANDO...";
 
                     try {
                         const res = await fetch("/procesar", {
@@ -293,10 +292,12 @@ def inicio():
                 };
 
                 reconocedorVoz.onend = () => {
-                    if (jarvisEncendido && !estaHablando) {
+                    if (sistemaConectado) {
                         try { reconocedorVoz.start(); } catch(e){}
                     }
                 };
+
+                reconocedorVoz.start();
             }
         </script>
     </body>
